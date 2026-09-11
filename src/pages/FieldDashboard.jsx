@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   HardHat,
@@ -10,22 +10,95 @@ import {
   AlertCircle,
   ArrowRight,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react";
-import { mockProjects } from "../data/mockProjects";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useAuth } from "../context/AuthContext";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { normalizeProject } from "../utils/supabaseHelpers";
+import { mockProjects } from "../data/mockProjects";
 import Panel from "../components/Panel";
 import RiskChip from "../components/RiskChip";
 import ProgressBar from "../components/ProgressBar";
 
 export function FieldDashboard() {
   const navigate = useNavigate();
-  const { officerName } = useAuth();
+  const { user, officerName } = useAuth();
 
-  // Pick 2-3 projects assigned to this Field Officer
-  const assignedProjects = mockProjects.filter(
-    (p) => p.id === "NH-4471" || p.id === "BR-2209"
-  );
+  const [assignedProjects, setAssignedProjects] = useState([]);
+  const [todayLoggedCount, setTodayLoggedCount] = useState(0);
+  const [monthlyCount, setMonthlyCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchFieldDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+
+    if (!isSupabaseConfigured()) {
+      const fallback = mockProjects
+        .filter((p) => p.id === "NH-4471" || p.id === "BR-2209")
+        .map(normalizeProject);
+      setAssignedProjects(fallback);
+      setTodayLoggedCount(1);
+      setMonthlyCount(18);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Fetch user's submissions to find previously worked-on projects
+      let submittedProjectIds = [];
+      if (user?.id) {
+        const { data: userEntries } = await supabase
+          .from("daily_entries")
+          .select("project_id, entry_date")
+          .eq("submitted_by", user.id);
+
+        if (userEntries && userEntries.length > 0) {
+          submittedProjectIds = [...new Set(userEntries.map((e) => e.project_id))];
+          setMonthlyCount(userEntries.length);
+
+          const todayIso = new Date().toISOString().split("T")[0];
+          const todayEntries = userEntries.filter((e) => e.entry_date === todayIso);
+          setTodayLoggedCount(todayEntries.length);
+        }
+      }
+
+      // 2. Fetch projects (either previously submitted by officer, or all projects if none submitted yet)
+      let projectQuery = supabase.from("projects").select(`
+        *,
+        daily_entries(id, entry_date, work_status, created_at)
+      `);
+
+      if (submittedProjectIds.length > 0) {
+        projectQuery = projectQuery.in("id", submittedProjectIds);
+      } else {
+        // Show primary active projects for new officers
+        projectQuery = projectQuery.limit(4);
+      }
+
+      const { data: prjData, error: prjErr } = await projectQuery;
+      if (prjErr) throw prjErr;
+
+      const normalized = (prjData || []).map(normalizeProject);
+      setAssignedProjects(normalized);
+    } catch (err) {
+      console.warn("Error loading field dashboard data:", err);
+      setError(err.message);
+      setAssignedProjects(
+        mockProjects.filter((p) => p.id === "NH-4471" || p.id === "BR-2209").map(normalizeProject)
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFieldDashboardData();
+  }, [user?.id]);
+
+  const todayIso = new Date().toISOString().split("T")[0];
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -36,7 +109,7 @@ export function FieldDashboard() {
             Field Operations & Site Telemetry
           </div>
           <div style={{ fontSize: 12.5, color: tokens.slate, marginTop: 2 }}>
-            Assigned to <strong style={{ color: tokens.ink }}>{officerName}</strong> · Madhya Pradesh Infrastructure Circle
+            Assigned to <strong style={{ color: tokens.ink }}>{officerName}</strong> · Live telemetry connection to Supabase
           </div>
         </div>
 
@@ -58,45 +131,79 @@ export function FieldDashboard() {
           }}
         >
           <ClipboardList size={14} color={tokens.steel} />
-          <span>View Today's Checklist (3 items)</span>
+          <span>View Today's Checklist</span>
         </button>
       </div>
+
+      {error && (
+        <div
+          style={{
+            padding: "10px 14px",
+            background: tokens.badBg,
+            borderRadius: tokens.radiusSm,
+            border: `1px solid ${tokens.bad}44`,
+            color: tokens.bad,
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertCircle size={15} />
+            <span>Database query notice: {error}</span>
+          </div>
+          <button
+            onClick={fetchFieldDashboardData}
+            style={{
+              background: "none",
+              border: "none",
+              color: tokens.bad,
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Summary Stat Tiles */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
         <Panel style={{ padding: "14px 16px" }}>
           <div style={{ fontSize: 11.5, color: tokens.slate, textTransform: "uppercase" }}>
-            Assigned Projects
+            Assigned Construction Sites
           </div>
           <div style={{ ...monoStyle, fontSize: 24, fontWeight: 700, color: tokens.ink, marginTop: 4 }}>
             {assignedProjects.length}
           </div>
           <div style={{ fontSize: 11.5, color: tokens.slate, marginTop: 2 }}>
-            Roads & Bridge sector active sites
+            Infrastructure sites under your surveillance
           </div>
         </Panel>
 
-        <Panel style={{ padding: "14px 16px", borderLeft: `3px solid ${tokens.warn}` }}>
+        <Panel style={{ padding: "14px 16px", borderLeft: `3px solid ${todayLoggedCount > 0 ? tokens.good : tokens.warn}` }}>
           <div style={{ fontSize: 11.5, color: tokens.slate, textTransform: "uppercase" }}>
             Today's Log Status
           </div>
-          <div style={{ ...monoStyle, fontSize: 24, fontWeight: 700, color: tokens.warn, marginTop: 4 }}>
-            1 Pending
+          <div style={{ ...monoStyle, fontSize: 24, fontWeight: 700, color: todayLoggedCount > 0 ? tokens.good : tokens.warn, marginTop: 4 }}>
+            {todayLoggedCount > 0 ? `${todayLoggedCount} Submitted` : "Entry Pending"}
           </div>
           <div style={{ fontSize: 11.5, color: tokens.slate, marginTop: 2 }}>
-            BR-2209 logged · NH-4471 awaiting daily upload
+            {todayLoggedCount > 0 ? "Daily verification recorded in database" : "Awaiting ground entry upload"}
           </div>
         </Panel>
 
         <Panel style={{ padding: "14px 16px" }}>
           <div style={{ fontSize: 11.5, color: tokens.slate, textTransform: "uppercase" }}>
-            Monthly Site Submissions
+            Total Site Submissions
           </div>
-          <div style={{ ...monoStyle, fontSize: 24, fontWeight: 700, color: tokens.good, marginTop: 4 }}>
-            18 Entries
+          <div style={{ ...monoStyle, fontSize: 24, fontWeight: 700, color: tokens.steel, marginTop: 4 }}>
+            {monthlyCount} Entries
           </div>
           <div style={{ fontSize: 11.5, color: tokens.slate, marginTop: 2 }}>
-            100% geo-tag verification rate
+            Stored persistently in daily_entries table
           </div>
         </Panel>
       </div>
@@ -104,147 +211,134 @@ export function FieldDashboard() {
       {/* Assigned Projects Section */}
       <div>
         <div style={{ fontSize: 13.5, fontWeight: 700, color: tokens.ink, marginBottom: 12 }}>
-          My Assigned Construction Sites
+          My Construction Sites
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-          {assignedProjects.map((p) => {
-            const isNH = p.id === "NH-4471";
-            const lastEntry = isNH ? "Yesterday, 10 Sep 2026" : "Today, 11 Sep 2026 (Submitted)";
-            const needsTodayEntry = isNH;
+        {loading ? (
+          <Panel style={{ padding: 32, textAlign: "center", color: tokens.slate }}>
+            <div style={{ ...monoStyle, fontSize: 13, fontWeight: 600, color: tokens.steel, marginBottom: 4 }}>
+              Loading Assigned Sites...
+            </div>
+            <div style={{ fontSize: 12 }}>Fetching projects and recent submission timestamps</div>
+          </Panel>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+            {assignedProjects.map((p) => {
+              // Check if an entry was logged today for this project
+              const entries = p.daily_entries || [];
+              const hasTodayLog = entries.some((e) => e.entry_date === todayIso);
 
-            return (
-              <Panel
-                key={p.id}
-                style={{
-                  padding: "20px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 14,
-                  borderTop: needsTodayEntry ? `3px solid ${tokens.warn}` : `3px solid ${tokens.good}`,
-                }}
-              >
-                {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ ...monoStyle, fontSize: 12, fontWeight: 700, color: tokens.steel }}>
-                        {p.id}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "1px 6px",
-                          background: tokens.paper,
-                          border: `1px solid ${tokens.line}`,
-                          borderRadius: tokens.radiusSm,
-                          color: tokens.slate,
-                        }}
-                      >
-                        {p.sector}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: tokens.ink, marginTop: 4 }}>
-                      {p.name}
-                    </div>
-                    <div style={{ fontSize: 12, color: tokens.slate, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
-                      <MapPin size={12} />
-                      <span>{p.location}</span>
-                      <span>·</span>
-                      <span>{p.contractor}</span>
-                    </div>
-                  </div>
-
-                  <RiskChip score={p.risk} />
-                </div>
-
-                {/* Progress bar */}
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 5 }}>
-                    <span style={{ color: tokens.slate }}>Site Progress:</span>
-                    <span style={{ ...monoStyle, fontWeight: 600 }}>
-                      Actual {p.actual}% / Planned {p.planned}%
-                    </span>
-                  </div>
-                  <ProgressBar planned={p.planned} actual={p.actual} />
-                </div>
-
-                {/* Last Entry Status */}
-                <div
+              return (
+                <Panel
+                  key={p.id}
                   style={{
-                    padding: "8px 10px",
-                    background: tokens.paper,
-                    borderRadius: tokens.radiusSm,
-                    border: `1px solid ${tokens.line}`,
+                    padding: "20px",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    fontSize: 11.5,
+                    flexDirection: "column",
+                    gap: 14,
+                    borderTop: hasTodayLog ? `3px solid ${tokens.good}` : `3px solid ${tokens.warn}`,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Clock size={13} color={tokens.slate} />
-                    <span style={{ color: tokens.slate }}>Last Ground Log:</span>
-                    <strong style={{ color: tokens.ink }}>{lastEntry}</strong>
+                  {/* Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ ...monoStyle, fontSize: 12, fontWeight: 700, color: tokens.steel }}>
+                          {p.code || p.id}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "1px 6px",
+                            background: tokens.paper,
+                            border: `1px solid ${tokens.line}`,
+                            borderRadius: tokens.radiusSm,
+                            color: tokens.slate,
+                          }}
+                        >
+                          {p.sector}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: tokens.ink, marginTop: 4 }}>
+                        {p.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: tokens.slate, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                        <MapPin size={12} />
+                        <span>{p.location}</span>
+                        <span>·</span>
+                        <span>{p.contractor}</span>
+                      </div>
+                    </div>
+
+                    <RiskChip score={p.risk} />
                   </div>
-                  {needsTodayEntry ? (
-                    <span style={{ color: tokens.warn, fontWeight: 600 }}>Entry Due</span>
-                  ) : (
-                    <span style={{ color: tokens.good, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-                      <CheckCircle2 size={12} /> Logged
-                    </span>
-                  )}
-                </div>
 
-                {/* Actions */}
-                <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 4 }}>
-                  <button
-                    onClick={() => navigate(`/field-entry/${p.id}`)}
+                  {/* Progress bar */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 5 }}>
+                      <span style={{ color: tokens.slate }}>Site Progress:</span>
+                      <span style={{ ...monoStyle, fontWeight: 600 }}>
+                        Actual {p.actual}% / Planned {p.planned}%
+                      </span>
+                    </div>
+                    <ProgressBar planned={p.planned} actual={p.actual} />
+                  </div>
+
+                  {/* Log Status */}
+                  <div
                     style={{
-                      flex: 1,
-                      padding: "9px 12px",
-                      background: needsTodayEntry ? tokens.steel : tokens.panel,
-                      color: needsTodayEntry ? "#FFFFFF" : tokens.ink,
-                      border: `1px solid ${needsTodayEntry ? tokens.steel : tokens.line}`,
+                      padding: "8px 10px",
+                      background: tokens.paper,
                       borderRadius: tokens.radiusSm,
-                      fontWeight: 600,
-                      fontSize: 12.5,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <PlusCircle size={14} />
-                    <span>{needsTodayEntry ? "Add Today's Entry" : "Add Additional Entry"}</span>
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                    style={{
-                      padding: "9px 12px",
-                      background: tokens.panel,
-                      color: tokens.slate,
                       border: `1px solid ${tokens.line}`,
-                      borderRadius: tokens.radiusSm,
-                      fontWeight: 500,
-                      fontSize: 12,
-                      cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
-                      gap: 4,
+                      justifyContent: "space-between",
+                      fontSize: 11.5,
                     }}
-                    title="View full project intelligence"
                   >
-                    <span>Inspect</span>
-                    <ArrowRight size={13} />
-                  </button>
-                </div>
-              </Panel>
-            );
-          })}
-        </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Clock size={13} color={tokens.slate} />
+                      <span style={{ color: tokens.slate }}>Today's Verification:</span>
+                    </div>
+                    {hasTodayLog ? (
+                      <span style={{ color: tokens.good, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+                        <CheckCircle2 size={12} /> Logged in Database
+                      </span>
+                    ) : (
+                      <span style={{ color: tokens.warn, fontWeight: 600 }}>Entry Due</span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 4 }}>
+                    <button
+                      onClick={() => navigate(`/field-entry/${p.id}`)}
+                      style={{
+                        flex: 1,
+                        padding: "9px 12px",
+                        background: hasTodayLog ? tokens.panel : tokens.steel,
+                        color: hasTodayLog ? tokens.ink : "#FFFFFF",
+                        border: `1px solid ${hasTodayLog ? tokens.line : tokens.steel}`,
+                        borderRadius: tokens.radiusSm,
+                        fontWeight: 600,
+                        fontSize: 12.5,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <PlusCircle size={14} />
+                      <span>{hasTodayLog ? "Add Additional Entry" : "Submit Ground Log"}</span>
+                    </button>
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

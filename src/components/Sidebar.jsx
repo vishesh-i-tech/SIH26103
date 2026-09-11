@@ -35,11 +35,11 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { role, logout, officerName } = useAuth();
 
-  const isField = role === "field";
+  const isField = role === "field_officer" || role === "field";
   const navItems = isField ? fieldNavItems : adminNavItems;
 
-  const handleSwitchUser = () => {
-    logout();
+  const handleSwitchUser = async () => {
+    await logout();
     navigate("/login");
   };
 

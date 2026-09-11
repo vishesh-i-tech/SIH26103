@@ -28,7 +28,7 @@ export function Header() {
     pageTitle = "Daily Ground Entry Upload";
   }
 
-  const isField = role === "field" || currentPath.startsWith("/field");
+  const isField = role === "field_officer" || role === "field" || currentPath.startsWith("/field");
 
   const todayStr = new Intl.DateTimeFormat("en-IN", {
     day: "numeric",

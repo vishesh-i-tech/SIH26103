@@ -1,69 +1,74 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Shield, HardHat, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Shield, HardHat, ArrowRight, AlertCircle, CheckCircle2, Lock, Mail, User } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useAuth } from "../context/AuthContext";
 import Panel from "../components/Panel";
 
-export function Login() {
+export function Register() {
   const navigate = useNavigate();
-  const { signIn, isConfigured } = useAuth();
+  const { signUp, isConfigured } = useAuth();
 
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("field_officer"); // 'admin' | 'field_officer'
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
+    setSuccessMsg("");
 
-    if (!email.trim()) {
-      setErrorMsg("Please enter your official email address.");
+    if (!fullName.trim()) {
+      setErrorMsg("Please enter your official full name.");
       return;
     }
-    if (!password) {
-      setErrorMsg("Please enter your password.");
+    if (!email.trim() || !email.includes("@")) {
+      setErrorMsg("Please provide a valid official email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters long.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await signIn({
+      const { data, error } = await signUp({
         email: email.trim(),
         password,
+        fullName: fullName.trim(),
+        role,
       });
 
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          setErrorMsg("Invalid email or password. Please verify your credentials.");
-        } else {
-          setErrorMsg(error.message || "Authentication failed. Please check your credentials.");
+        // Humanize common Supabase errors
+        let friendly = error.message;
+        if (error.message.includes("already registered") || error.message.includes("already been taken")) {
+          friendly = "An account with this email address already exists. Please log in instead.";
+        } else if (error.message.includes("Password should be")) {
+          friendly = "Password is too weak. Please use at least 6 characters with mixed letters and numbers.";
+        } else if (error.message.includes("valid email")) {
+          friendly = "Please enter a properly formatted email address.";
         }
+        setErrorMsg(friendly);
       } else {
-        // Redirect based on role
-        const userRole = data?.user?.user_metadata?.role || "admin";
-        if (userRole === "field_officer" || userRole === "field") {
-          navigate("/field-dashboard");
-        } else {
-          navigate("/dashboard");
-        }
+        setSuccessMsg("Registration successful! Redirecting to your dashboard...");
+        setTimeout(() => {
+          if (role === "admin") {
+            navigate("/dashboard");
+          } else {
+            navigate("/field-dashboard");
+          }
+        }, 1200);
       }
     } catch (err) {
-      setErrorMsg(err.message || "An unexpected network or authentication error occurred.");
+      setErrorMsg(err.message || "An unexpected error occurred during registration.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Quick helper to fill demo credentials if needed
-  const fillDemo = (roleKey) => {
-    if (roleKey === "admin") {
-      setEmail("admin@mospi.gov.in");
-      setPassword("MoSPI@Admin2026");
-    } else {
-      setEmail("field.officer@mospi.gov.in");
-      setPassword("Field@Engineer2026");
     }
   };
 
@@ -79,7 +84,7 @@ export function Login() {
         padding: "24px",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 460 }}>
+      <div style={{ width: "100%", maxWidth: 480 }}>
         {/* Government Emblem / Header */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div
@@ -104,18 +109,18 @@ export function Login() {
             Ministry of Statistics and Programme Implementation (MoSPI)
           </div>
           <div style={{ fontSize: 11, color: tokens.slate, marginTop: 2 }}>
-            Infrastructure & Project Monitoring Division (IPMD) · Live Portal Access
+            Infrastructure & Project Monitoring Division (IPMD) · Portal Registration
           </div>
         </div>
 
-        {/* Login Box */}
-        <Panel style={{ padding: "28px 24px" }}>
+        {/* Register Box */}
+        <Panel style={{ padding: "28px 26px" }}>
           <form onSubmit={handleSubmit}>
             <div style={{ fontSize: 14, fontWeight: 700, color: tokens.ink, marginBottom: 16 }}>
-              Officer Sign In
+              Register Official Officer Account
             </div>
 
-            {/* Error Message */}
+            {/* Error Notification */}
             {errorMsg && (
               <div
                 style={{
@@ -137,10 +142,58 @@ export function Login() {
               </div>
             )}
 
-            {/* Email Field */}
+            {/* Success Notification */}
+            {successMsg && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  background: tokens.goodBg,
+                  borderRadius: tokens.radiusSm,
+                  border: `1px solid ${tokens.good}44`,
+                  color: tokens.good,
+                  fontSize: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            {/* Full Name */}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 5 }}>
-                OFFICIAL EMAIL ADDRESS
+                OFFICIAL FULL NAME *
+              </label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Er. Rajesh Verma or Dr. Alok Sharma"
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px 9px 34px",
+                    fontSize: 13,
+                    border: `1px solid ${tokens.line}`,
+                    borderRadius: tokens.radiusSm,
+                    background: tokens.panel,
+                    color: tokens.ink,
+                    outline: "none",
+                  }}
+                />
+                <User size={15} color={tokens.slate} style={{ position: "absolute", left: 10, top: 11 }} />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 5 }}>
+                OFFICIAL EMAIL ADDRESS *
               </label>
               <div style={{ position: "relative" }}>
                 <input
@@ -164,10 +217,10 @@ export function Login() {
               </div>
             </div>
 
-            {/* Password Field */}
-            <div style={{ marginBottom: 18 }}>
+            {/* Password */}
+            <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 5 }}>
-                SECURITY PASSCODE
+                SECURITY PASSCODE (MIN. 6 CHARS) *
               </label>
               <div style={{ position: "relative" }}>
                 <input
@@ -192,6 +245,35 @@ export function Login() {
               </div>
             </div>
 
+            {/* Role Selection Dropdown */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 5 }}>
+                GOVERNMENT ROLE SCOPE *
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  fontSize: 13,
+                  border: `1px solid ${tokens.line}`,
+                  borderRadius: tokens.radiusSm,
+                  background: tokens.panel,
+                  color: tokens.ink,
+                  outline: "none",
+                }}
+              >
+                <option value="field_officer">Field Officer (Site Engineer / Ground Telemetry)</option>
+                <option value="admin">MoSPI Admin (Central IPMD Oversight & Risk Governance)</option>
+              </select>
+              <div style={{ fontSize: 11, color: tokens.slate, marginTop: 4 }}>
+                {role === "admin"
+                  ? "Access central portfolio overview, project directory, priority queue, and billing anomaly gates."
+                  : "Submit ground verification entries, upload site evidence, and track assigned work orders."}
+              </div>
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -213,48 +295,12 @@ export function Login() {
                 transition: "background 0.15s ease",
               }}
             >
-              <span>{isSubmitting ? "Authenticating..." : "Sign In to Portal"}</span>
+              <span>{isSubmitting ? "Creating Account..." : "Complete Registration"}</span>
               <ArrowRight size={14} />
             </button>
           </form>
 
-          {/* Quick Demo Fill Buttons (Convenient for Reviewers) */}
-          <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => fillDemo("admin")}
-              style={{
-                flex: 1,
-                padding: "6px 8px",
-                background: tokens.paper,
-                border: `1px solid ${tokens.line}`,
-                borderRadius: tokens.radiusSm,
-                fontSize: 11,
-                color: tokens.slate,
-                cursor: "pointer",
-              }}
-            >
-              Demo Admin Email
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemo("field")}
-              style={{
-                flex: 1,
-                padding: "6px 8px",
-                background: tokens.paper,
-                border: `1px solid ${tokens.line}`,
-                borderRadius: tokens.radiusSm,
-                fontSize: 11,
-                color: tokens.slate,
-                cursor: "pointer",
-              }}
-            >
-              Demo Field Email
-            </button>
-          </div>
-
-          {/* Register Link */}
+          {/* Switch to Login */}
           <div
             style={{
               marginTop: 18,
@@ -265,16 +311,16 @@ export function Login() {
               textAlign: "center",
             }}
           >
-            Don't have an account?{" "}
+            Already have an officer account?{" "}
             <Link
-              to="/register"
+              to="/login"
               style={{
                 color: tokens.steel,
                 fontWeight: 600,
                 textDecoration: "none",
               }}
             >
-              Register here
+              Login here
             </Link>
           </div>
         </Panel>
@@ -283,4 +329,4 @@ export function Login() {
   );
 }
 
-export default Login;
+export default Register;

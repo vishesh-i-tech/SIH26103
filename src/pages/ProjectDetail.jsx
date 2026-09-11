@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   LineChart,
@@ -32,6 +32,8 @@ import {
 import { tokens, monoStyle } from "../styles/tokens";
 import { riskTone, riskLabel, formatINR } from "../utils/risk";
 import { useProjects } from "../context/ProjectContext";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { normalizeProject } from "../utils/supabaseHelpers";
 import Panel from "../components/Panel";
 import RiskChip from "../components/RiskChip";
 import ProgressBar from "../components/ProgressBar";
@@ -42,8 +44,69 @@ export function ProjectDetail() {
   const { getProject, projects } = useProjects();
   const [activeTab, setActiveTab] = useState("overview");
   const [showRiskTooltip, setShowRiskTooltip] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [project, setProject] = useState(() => getProject(id) || projects[0]);
 
-  const project = getProject(id) || projects[0];
+  useEffect(() => {
+    let mounted = true;
+    async function loadProjectDetails() {
+      setLoading(true);
+      setError(null);
+
+      if (!isSupabaseConfigured()) {
+        const found = getProject(id) || projects[0];
+        if (mounted) {
+          setProject(found);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        let query = supabase
+          .from("projects")
+          .select(`
+            *,
+            risk_trend(month_label, risk_value, recorded_at),
+            risk_factors(factor_text, weight),
+            billing_entries(id, bill_code, claimed_amount, expected_amount, status, created_at),
+            daily_entries(*, profiles:submitted_by(full_name))
+          `);
+
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        if (isUuid) {
+          query = query.eq("id", id);
+        } else {
+          query = query.eq("code", id);
+        }
+
+        const { data, error: qErr } = await query.maybeSingle();
+
+        if (qErr) throw qErr;
+
+        if (data && mounted) {
+          setProject(normalizeProject(data));
+        } else if (mounted) {
+          const found = getProject(id) || projects[0];
+          setProject(found);
+        }
+      } catch (err) {
+        console.warn("Error fetching project details from Supabase:", err);
+        if (mounted) {
+          setError(err.message);
+          setProject(getProject(id) || projects[0]);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadProjectDetails();
+    return () => {
+      mounted = false;
+    };
+  }, [id, projects]);
 
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -280,81 +343,104 @@ function OverviewTab({ project }) {
 }
 
 function DailyRecordTab({ project }) {
-  const entries = [
-    {
-      date: "11 Sep 2026",
-      status: project.risk >= 70 ? "Issue Logged" : "Running",
-      by: "Site Engineer (Rajesh Verma)",
-      note: "Batching plant material receipt verified. 48 MT TMT bars inspected with mill test reports.",
-    },
-    {
-      date: "10 Sep 2026",
-      status: "Running",
-      by: "Material Engineer (S. Chawla)",
-      note: "Cube test sampling for pier cap segment 14 conducted; 7-day compressive test satisfactory.",
-    },
-    {
-      date: "09 Sep 2026",
-      status: project.risk >= 70 ? "Stalled" : "Running",
-      by: "Sub Engineer (K. Rao)",
-      note: project.risk >= 70
-        ? "Work slowed down due to right-of-way demarcation dispute at chainage 42+200."
-        : "Routine compaction test on sub-base layer cleared for bituminous layer.",
-    },
-  ];
+  const entries = (project.dailyEntries && project.dailyEntries.length > 0)
+    ? project.dailyEntries
+    : [
+        {
+          date: "11 Sep 2026",
+          status: project.risk >= 70 ? "Issue Logged" : "Running",
+          submittedBy: "Site Engineer (Rajesh Verma)",
+          notes: "Batching plant material receipt verified. 48 MT TMT bars inspected with mill test reports.",
+        },
+        {
+          date: "10 Sep 2026",
+          status: "Running",
+          submittedBy: "Material Engineer (S. Chawla)",
+          notes: "Cube test sampling for pier cap segment 14 conducted; 7-day compressive test satisfactory.",
+        },
+      ];
 
   return (
     <div className="responsive-grid-2" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
       <Panel>
         <div style={{ padding: "12px 18px", borderBottom: `1px solid ${tokens.line}`, fontSize: 12, fontWeight: 700, color: tokens.slate, textTransform: "uppercase" }}>
-          Ground Verification Timeline
+          Ground Verification Timeline ({entries.length} records)
         </div>
-        {entries.map((entry, idx) => (
-          <div
-            key={idx}
-            style={{
-              padding: "14px 18px",
-              borderBottom: idx < entries.length - 1 ? `1px solid ${tokens.line}` : "none",
-              display: "flex",
-              gap: 12,
-            }}
-          >
+        {entries.map((entry, idx) => {
+          const isStalled = entry.status === "Stalled";
+          const isOff = entry.status === "Off";
+          const statusTone = isStalled ? tokens.bad : isOff ? tokens.warn : tokens.good;
+          const statusBg = isStalled ? tokens.badBg : isOff ? tokens.warnBg : tokens.goodBg;
+
+          return (
             <div
+              key={entry.id || idx}
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: tokens.radiusSm,
-                background: tokens.paper,
+                padding: "14px 18px",
+                borderBottom: idx < entries.length - 1 ? `1px solid ${tokens.line}` : "none",
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                border: `1px solid ${tokens.line}`,
+                gap: 12,
               }}
             >
-              <Camera size={14} color={tokens.slate} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.ink }}>{entry.date}</span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    ...monoStyle,
-                    color: entry.status === "Stalled" ? tokens.bad : tokens.good,
-                    background: entry.status === "Stalled" ? tokens.badBg : tokens.goodBg,
-                    padding: "2px 6px",
-                    borderRadius: tokens.radiusSm,
-                  }}
-                >
-                  {entry.status}
-                </span>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: tokens.radiusSm,
+                  background: tokens.paper,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  border: `1px solid ${tokens.line}`,
+                }}
+              >
+                <Camera size={14} color={entry.hasPhoto ? tokens.steel : tokens.slate} />
               </div>
-              <div style={{ fontSize: 11, color: tokens.slate, marginTop: 2 }}>{entry.by}</div>
-              <div style={{ fontSize: 12, color: tokens.ink, marginTop: 5 }}>{entry.note}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: tokens.ink }}>{entry.date}</span>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {entry.reviewStatus && (
+                      <span style={{ fontSize: 10.5, color: tokens.slate }}>
+                        {entry.reviewStatus}
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        ...monoStyle,
+                        color: statusTone,
+                        background: statusBg,
+                        padding: "2px 6px",
+                        borderRadius: tokens.radiusSm,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {entry.status}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: tokens.slate, marginTop: 2 }}>
+                  Logged by: <strong style={{ color: tokens.ink }}>{entry.submittedBy || "Site Engineer"}</strong>
+                </div>
+                {entry.reason && (
+                  <div style={{ fontSize: 11.5, color: tokens.bad, marginTop: 3 }}>
+                    Impediment Root Cause: {entry.reason}
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: tokens.ink, marginTop: 4 }}>
+                  {entry.notes || entry.note}
+                </div>
+                {entry.materials && entry.materials !== "None logged" && (
+                  <div style={{ fontSize: 11, color: tokens.slate, marginTop: 4 }}>
+                    Materials verified: {entry.materials}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </Panel>
 
       <Panel style={{ padding: 18 }}>

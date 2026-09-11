@@ -32,7 +32,8 @@ export function Assistant() {
     // 1. Direct Project ID or Name Match
     const matchedProject = projects.find(
       (p) =>
-        q.includes(p.id.toLowerCase()) ||
+        (p.code && q.includes(p.code.toLowerCase())) ||
+        (p.id && q.includes(p.id.toLowerCase())) ||
         q.includes(p.name.toLowerCase().split(" ")[0].toLowerCase())
     );
 

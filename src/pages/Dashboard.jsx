@@ -17,7 +17,6 @@ import {
   Clock,
   Layers,
 } from "lucide-react";
-import { mockProjects } from "../data/mockProjects";
 import { tokens, monoStyle } from "../styles/tokens";
 import { riskTone, riskLabel, formatINR } from "../utils/risk";
 import { useProjects } from "../context/ProjectContext";
@@ -26,24 +25,26 @@ import RiskChip from "../components/RiskChip";
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { projects } = useProjects();
+  const { projects, loading, error, refreshProjects } = useProjects();
 
   const totalProjects = projects.length;
   const highRiskProjects = projects.filter((p) => p.risk >= 70);
   const watchProjects = projects.filter((p) => p.risk >= 45 && p.risk < 70);
   const stableProjects = projects.filter((p) => p.risk < 45);
 
-  const totalOriginalCost = projects.reduce((s, p) => s + p.costOriginal, 0);
-  const totalRevisedCost = projects.reduce((s, p) => s + p.costRevised, 0);
-  const costDriftPct = (((totalRevisedCost - totalOriginalCost) / totalOriginalCost) * 100).toFixed(1);
+  const totalOriginalCost = projects.reduce((s, p) => s + (p.costOriginal || 0), 0);
+  const totalRevisedCost = projects.reduce((s, p) => s + (p.costRevised || 0), 0);
+  const costDriftPct = totalOriginalCost > 0
+    ? (((totalRevisedCost - totalOriginalCost) / totalOriginalCost) * 100).toFixed(1)
+    : "0.0";
 
   // 6-month portfolio average risk trend
   const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep"];
   const avgTrend = months.map((m, i) => ({
     m,
-    v: Math.round(
-      projects.reduce((sum, p) => sum + (p.trend?.[i]?.v || 0), 0) / projects.length
-    ),
+    v: projects.length > 0
+      ? Math.round(projects.reduce((sum, p) => sum + (p.trend?.[i]?.v || 0), 0) / projects.length)
+      : 0,
   }));
 
   const firstAvg = avgTrend[0]?.v || 50;
@@ -54,6 +55,29 @@ export function Dashboard() {
 
   // Top ranked projects by risk
   const ranked = [...projects].sort((a, b) => b.risk - a.risk);
+
+  if (loading) {
+    return (
+      <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: tokens.ink }}>
+            Central Sector Portfolio Overview
+          </div>
+          <div style={{ fontSize: 12.5, color: tokens.slate, marginTop: 2 }}>
+            Connecting to Supabase and computing portfolio KPIs...
+          </div>
+        </div>
+        <Panel style={{ padding: 36, textAlign: "center" }}>
+          <div style={{ ...monoStyle, fontSize: 13, fontWeight: 600, color: tokens.steel, marginBottom: 6 }}>
+            Loading live portfolio analytics...
+          </div>
+          <div style={{ fontSize: 12, color: tokens.slate }}>
+            Fetching projects, cost metrics, and risk trajectories from Postgres.
+          </div>
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 20 }}>

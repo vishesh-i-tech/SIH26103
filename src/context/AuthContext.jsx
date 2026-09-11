@@ -1,132 +1,246 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 const AuthContext = createContext(null);
 
-const initialSubmissions = [
-  {
-    id: "SUB-104",
-    date: "11 Sep 2026",
-    projectId: "NH-4471",
-    projectName: "Indore–Betul Highway Widening (Package 2)",
-    status: "Running",
-    reason: "",
-    materials: "Cement: 120 bags · Steel: 42 MT",
-    notes: "Girder casting for Pier 12 completed. Slump test: 110mm.",
-    hasPhoto: true,
-    photoName: "geo_chainage_42_pier12.jpg",
-    reviewStatus: "Pending Review",
-    submittedBy: "Rajesh Verma (Site Engineer)",
-  },
-  {
-    id: "SUB-103",
-    date: "10 Sep 2026",
-    projectId: "BR-2209",
-    projectName: "Narmada River Bridge, Hoshangabad",
-    status: "Running",
-    reason: "",
-    materials: "Cement: 90 bags · Sand: 28 cum",
-    notes: "Abutment A2 shuttering work inspected and cleared for concrete pour.",
-    hasPhoto: true,
-    photoName: "narmada_abutment_a2.jpg",
-    reviewStatus: "Reviewed",
-    reviewNote: "Verified by IPMD Technical Cell",
-    submittedBy: "Rajesh Verma (Site Engineer)",
-  },
-  {
-    id: "SUB-102",
-    date: "09 Sep 2026",
-    projectId: "NH-4471",
-    projectName: "Indore–Betul Highway Widening (Package 2)",
-    status: "Stalled",
-    reason: "Land/legal dispute",
-    materials: "None logged",
-    notes: "Right-of-way dispute at km 44. Local revenue authority team visited.",
-    hasPhoto: true,
-    photoName: "row_dispute_km44.jpg",
-    reviewStatus: "Reviewed",
-    reviewNote: "Escalated to District Collector",
-    submittedBy: "Rajesh Verma (Site Engineer)",
-  },
-  {
-    id: "SUB-101",
-    date: "08 Sep 2026",
-    projectId: "BR-2209",
-    projectName: "Narmada River Bridge, Hoshangabad",
-    status: "Off",
-    reason: "Weather",
-    materials: "None logged",
-    notes: "River water level exceeded safety limit (Gauge 3.4m). Operations halted.",
-    hasPhoto: false,
-    photoName: null,
-    reviewStatus: "Reviewed",
-    reviewNote: "Monsoon stoppage logged in schedule buffer",
-    submittedBy: "Rajesh Verma (Site Engineer)",
-  },
-];
-
 export function AuthProvider({ children }) {
-  const [role, setRoleState] = useState(() => {
-    return localStorage.getItem("paimana_role") || "admin";
-  });
+  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [officerName, setOfficerName] = useState(() => {
-    return localStorage.getItem("paimana_officer") || "Er. Rajesh Verma";
-  });
+  // Helper to fetch user profile from profiles table
+  const fetchProfile = async (userId) => {
+    if (!userId || !isSupabaseConfigured()) return null;
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
 
-  const [submissions, setSubmissions] = useState(() => {
-    const saved = localStorage.getItem("paimana_submissions");
-    if (saved) {
+      if (error) {
+        console.warn("Could not fetch profile:", error.message);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.warn("Error fetching profile:", err);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function initAuth() {
+      if (!isSupabaseConfigured()) {
+        // Fallback for demo when Supabase credentials have not been configured yet
+        const savedRole = localStorage.getItem("paimana_role");
+        const savedName = localStorage.getItem("paimana_officer");
+        if (savedRole) {
+          setProfile({
+            id: "demo-user-id",
+            full_name: savedName || (savedRole === "admin" ? "MoSPI IPMD Admin" : "Er. Rajesh Verma"),
+            role: savedRole,
+          });
+          setUser({ id: "demo-user-id", email: "demo@mospi.gov.in" });
+        }
+        if (mounted) setLoading(false);
+        return;
+      }
+
       try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return initialSubmissions;
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn("Error getting session:", error.message);
+        }
+
+        if (mounted) {
+          setSession(initialSession);
+          setUser(initialSession?.user || null);
+          if (initialSession?.user) {
+            const userProfile = await fetchProfile(initialSession.user.id);
+            if (userProfile) {
+              setProfile(userProfile);
+            } else if (initialSession.user.user_metadata) {
+              // Fallback to user_metadata if profiles row takes a moment to create
+              setProfile({
+                id: initialSession.user.id,
+                full_name: initialSession.user.user_metadata.full_name || "Officer",
+                role: initialSession.user.user_metadata.role || "field_officer",
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Auth initialization error:", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
     }
-    return initialSubmissions;
-  });
 
-  const setRole = (newRole, name = null) => {
-    setRoleState(newRole);
-    localStorage.setItem("paimana_role", newRole);
-    if (name) {
-      setOfficerName(name);
-      localStorage.setItem("paimana_officer", name);
+    initAuth();
+
+    // Listen for auth state changes
+    let authListener = null;
+    if (isSupabaseConfigured()) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        if (!mounted) return;
+        setSession(newSession);
+        setUser(newSession?.user || null);
+
+        if (newSession?.user) {
+          const userProfile = await fetchProfile(newSession.user.id);
+          if (userProfile) {
+            setProfile(userProfile);
+          } else if (newSession.user.user_metadata) {
+            setProfile({
+              id: newSession.user.id,
+              full_name: newSession.user.user_metadata.full_name || "Officer",
+              role: newSession.user.user_metadata.role || "field_officer",
+            });
+          }
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      });
+      authListener = data?.subscription;
     }
-  };
 
-  const logout = () => {
-    // Reset session and set role back to unassigned or default admin
-    localStorage.removeItem("paimana_role");
-    setRoleState("admin");
-  };
-
-  const addSubmission = (submission) => {
-    const newEntry = {
-      id: `SUB-${100 + submissions.length + 1}`,
-      date: new Intl.DateTimeFormat("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }).format(new Date()),
-      reviewStatus: "Pending Review",
-      submittedBy: officerName,
-      ...submission,
+    return () => {
+      mounted = false;
+      if (authListener) authListener.unsubscribe();
     };
-    const updated = [newEntry, ...submissions];
-    setSubmissions(updated);
-    localStorage.setItem("paimana_submissions", JSON.stringify(updated));
-    return newEntry;
+  }, []);
+
+  // Sign in with Email and Password
+  const signIn = async ({ email, password }) => {
+    if (!isSupabaseConfigured()) {
+      // Demo mode login
+      const demoRole = email.includes("field") ? "field_officer" : "admin";
+      const demoName = demoRole === "admin" ? "MoSPI IPMD Admin" : "Er. Rajesh Verma";
+      setProfile({ id: "demo-user-id", full_name: demoName, role: demoRole });
+      setUser({ id: "demo-user-id", email });
+      localStorage.setItem("paimana_role", demoRole);
+      localStorage.setItem("paimana_officer", demoName);
+      return { data: { user: { id: "demo-user-id", email } }, error: null };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (data.user) {
+      setUser(data.user);
+      setSession(data.session);
+      let userProfile = await fetchProfile(data.user.id);
+      if (!userProfile && data.user.user_metadata) {
+        userProfile = {
+          id: data.user.id,
+          full_name: data.user.user_metadata.full_name || "Officer",
+          role: data.user.user_metadata.role || "field_officer",
+        };
+      }
+      setProfile(userProfile);
+    }
+
+    return { data, error: null };
   };
+
+  // Sign up with Email, Password, Full Name, and Role
+  const signUp = async ({ email, password, fullName, role }) => {
+    if (!isSupabaseConfigured()) {
+      setProfile({ id: "demo-user-id", full_name: fullName, role });
+      setUser({ id: "demo-user-id", email });
+      localStorage.setItem("paimana_role", role);
+      localStorage.setItem("paimana_officer", fullName);
+      return { data: { user: { id: "demo-user-id", email } }, error: null };
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: role,
+        },
+      },
+    });
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    // Insert or update profile row in profiles table
+    if (data?.user) {
+      try {
+        const { error: profileError } = await supabase.from("profiles").upsert({
+          id: data.user.id,
+          full_name: fullName,
+          role: role,
+        });
+
+        if (profileError) {
+          console.warn("Profile table insert notice:", profileError.message);
+        }
+
+        const newProfile = {
+          id: data.user.id,
+          full_name: fullName,
+          role: role,
+        };
+        setProfile(newProfile);
+        setUser(data.user);
+      } catch (profileErr) {
+        console.warn("Could not insert profile:", profileErr);
+      }
+    }
+
+    return { data, error: null };
+  };
+
+  // Sign out
+  const logout = async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn("Supabase sign out error:", err);
+      }
+    }
+    localStorage.removeItem("paimana_role");
+    localStorage.removeItem("paimana_officer");
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+  };
+
+  // Normalized role values: 'admin' or 'field_officer'
+  const normalizedRole = profile?.role === "field" ? "field_officer" : (profile?.role || null);
+  const officerName = profile?.full_name || (normalizedRole === "field_officer" ? "Field Officer" : "MoSPI Admin");
 
   return (
     <AuthContext.Provider
       value={{
-        role,
+        session,
+        user,
+        profile,
+        role: normalizedRole,
         officerName,
-        setRole,
+        loading,
+        signIn,
+        signUp,
         logout,
-        submissions,
-        addSubmission,
+        fetchProfile,
+        isConfigured: isSupabaseConfigured(),
       }}
     >
       {children}

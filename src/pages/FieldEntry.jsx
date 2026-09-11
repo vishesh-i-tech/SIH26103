@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -24,14 +24,58 @@ const reasonsList = [
   "Other",
 ];
 
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { normalizeProject } from "../utils/supabaseHelpers";
+
 export function FieldEntry() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const { addSubmission, officerName } = useAuth();
+  const { user, addSubmission, officerName } = useAuth();
 
-  const project =
-    mockProjects.find((p) => p.id === projectId) ||
-    mockProjects[0];
+  const [project, setProject] = useState(() => {
+    return mockProjects.find((p) => p.id === projectId || p.code === projectId) || mockProjects[0];
+  });
+  const [loadingProject, setLoadingProject] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadProject() {
+      if (!isSupabaseConfigured()) {
+        const found = mockProjects.find((p) => p.id === projectId || p.code === projectId) || mockProjects[0];
+        if (mounted) {
+          setProject(normalizeProject(found));
+          setLoadingProject(false);
+        }
+        return;
+      }
+
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId);
+        let query = supabase.from("projects").select("*");
+        if (isUuid) {
+          query = query.eq("id", projectId);
+        } else {
+          query = query.eq("code", projectId);
+        }
+
+        const { data, error } = await query.maybeSingle();
+        if (error) throw error;
+        if (data && mounted) {
+          setProject(normalizeProject(data));
+        }
+      } catch (err) {
+        console.warn("Could not load project for FieldEntry:", err);
+      } finally {
+        if (mounted) setLoadingProject(false);
+      }
+    }
+    loadProject();
+    return () => {
+      mounted = false;
+    };
+  }, [projectId]);
 
   const todayStr = new Intl.DateTimeFormat("en-CA").format(new Date()); // YYYY-MM-DD for date input
 
@@ -65,30 +109,59 @@ export function FieldEntry() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg("");
+    setIsSubmitting(true);
 
     const materialsSummary = [];
     if (cementBags) materialsSummary.push(`Cement: ${cementBags} bags`);
     if (steelMT) materialsSummary.push(`Steel: ${steelMT} MT`);
     if (aggregateCum) materialsSummary.push(`Aggregate: ${aggregateCum} cum`);
 
-    addSubmission({
-      projectId: project.id,
-      projectName: project.name,
-      status,
-      reason: status !== "Running" ? reason : "",
-      materials: materialsSummary.length > 0 ? materialsSummary.join(" · ") : "None logged",
-      notes: notes.trim() || "Routine inspection logged.",
-      hasPhoto: Boolean(photoFile || photoPreview),
-      photoName: photoFile ? photoFile.name : "geo_tagged_site_photo.jpg",
-      submittedBy: officerName,
-    });
+    try {
+      if (isSupabaseConfigured()) {
+        const { data, error: insertErr } = await supabase.from("daily_entries").insert({
+          project_id: project.id,
+          submitted_by: user?.id || null,
+          entry_date: date,
+          work_status: status,
+          delay_reason: status !== "Running" ? reason : null,
+          material_notes: materialsSummary.length > 0 ? materialsSummary.join(" · ") : null,
+          photo_url: photoFile ? photoFile.name : (photoPreview ? "geo_tagged_site_photo.jpg" : null),
+          notes: notes.trim() || null,
+          reviewed_status: "Pending Review",
+        });
 
-    setSubmittedSuccess(true);
-    setTimeout(() => {
-      navigate("/field-submissions");
-    }, 1500);
+        if (insertErr) {
+          throw insertErr;
+        }
+      }
+
+      // Also record in local context state for immediate preview
+      if (typeof addSubmission === "function") {
+        addSubmission({
+          projectId: project.code || project.id,
+          projectName: project.name,
+          status,
+          reason: status !== "Running" ? reason : "",
+          materials: materialsSummary.length > 0 ? materialsSummary.join(" · ") : "None logged",
+          notes: notes.trim() || "Routine inspection logged.",
+          hasPhoto: Boolean(photoFile || photoPreview),
+          photoName: photoFile ? photoFile.name : "geo_tagged_site_photo.jpg",
+          submittedBy: officerName,
+        });
+      }
+
+      setSubmittedSuccess(true);
+      setTimeout(() => {
+        navigate("/field-submissions");
+      }, 1500);
+    } catch (err) {
+      console.error("Error submitting daily entry to Supabase:", err);
+      setErrorMsg(err.message || "Failed to submit ground entry to database.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -136,6 +209,29 @@ export function FieldEntry() {
             <div style={{ fontSize: 12, color: tokens.ink, marginTop: 2 }}>
               Your daily site log has been appended to the project verification timeline. Redirecting to My Submissions...
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Notification Banner */}
+      {errorMsg && (
+        <div
+          style={{
+            padding: "14px 18px",
+            background: tokens.badBg,
+            border: `1px solid ${tokens.bad}`,
+            borderRadius: tokens.radiusSm,
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            color: tokens.bad,
+            fontSize: 12.5,
+          }}
+        >
+          <AlertTriangle size={18} color={tokens.bad} />
+          <div>
+            <strong>Submission Error:</strong> {errorMsg}
           </div>
         </div>
       )}

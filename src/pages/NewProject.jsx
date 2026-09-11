@@ -13,11 +13,13 @@ import {
 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useProjects } from "../context/ProjectContext";
+import { useAuth } from "../context/AuthContext";
 import Panel from "../components/Panel";
 
 export function NewProject() {
   const navigate = useNavigate();
   const { addProject } = useProjects();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     id: "NH-7720",
@@ -30,16 +32,26 @@ export function NewProject() {
     duration: "36",
     end: "Nov 2029",
   });
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const created = addProject(formData);
-    navigate(`/projects/${created.id}`);
+    setErrorMsg("");
+    setIsSubmitting(true);
+    try {
+      const created = await addProject(formData, user?.id);
+      navigate(`/projects/${created.id}`);
+    } catch (err) {
+      console.error("Failed to onboard project:", err);
+      setErrorMsg(err.message || "Failed to sanction project in database.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -77,6 +89,22 @@ export function NewProject() {
 
       <Panel style={{ padding: "26px 30px" }}>
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Error Banner */}
+          {errorMsg && (
+            <div
+              style={{
+                padding: "12px 16px",
+                background: tokens.badBg,
+                borderRadius: tokens.radiusSm,
+                border: `1px solid ${tokens.bad}`,
+                color: tokens.bad,
+                fontSize: 12.5,
+              }}
+            >
+              <strong>Error creating project:</strong> {errorMsg}
+            </div>
+          )}
+
           {/* Important Government Onboarding Note */}
           <div
             style={{
