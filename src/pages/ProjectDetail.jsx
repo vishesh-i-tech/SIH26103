@@ -34,6 +34,11 @@ import { riskTone, riskLabel, formatINR } from "../utils/risk";
 import { useProjects } from "../context/ProjectContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { normalizeProject } from "../utils/supabaseHelpers";
+import {
+  getInspectionCompliance,
+  getComplianceStats,
+  getDefaultDailyEntries,
+} from "../utils/inspectionCompliance";
 import Panel from "../components/Panel";
 import RiskChip from "../components/RiskChip";
 import ProgressBar from "../components/ProgressBar";
@@ -371,20 +376,26 @@ function OverviewTab({ project }) {
 function DailyRecordTab({ project }) {
   const entries = (project.dailyEntries && project.dailyEntries.length > 0)
     ? project.dailyEntries
-    : [
-        {
-          date: "11 Sep 2026",
-          status: project.risk >= 70 ? "Issue Logged" : "Running",
-          submittedBy: "Site Engineer (Rajesh Verma)",
-          notes: "Batching plant material receipt verified. 48 MT TMT bars inspected with mill test reports.",
-        },
-        {
-          date: "10 Sep 2026",
-          status: "Running",
-          submittedBy: "Material Engineer (S. Chawla)",
-          notes: "Cube test sampling for pier cap segment 14 conducted; 7-day compressive test satisfactory.",
-        },
-      ];
+    : getDefaultDailyEntries(project);
+
+  const complianceList = getInspectionCompliance(project);
+  const complianceStats = getComplianceStats(complianceList);
+
+  const badgeBg = complianceStats.isAllPassed
+    ? tokens.goodBg
+    : complianceStats.hasCritical
+    ? tokens.badBg
+    : tokens.warnBg;
+  const badgeColor = complianceStats.isAllPassed
+    ? tokens.good
+    : complianceStats.hasCritical
+    ? tokens.bad
+    : tokens.warn;
+  const badgeBorder = complianceStats.isAllPassed
+    ? `${tokens.good}44`
+    : complianceStats.hasCritical
+    ? `${tokens.bad}44`
+    : `${tokens.warn}44`;
 
   return (
     <div className="responsive-grid-2" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
@@ -395,8 +406,9 @@ function DailyRecordTab({ project }) {
         {entries.map((entry, idx) => {
           const isStalled = entry.status === "Stalled";
           const isOff = entry.status === "Off";
-          const statusTone = isStalled ? tokens.bad : isOff ? tokens.warn : tokens.good;
-          const statusBg = isStalled ? tokens.badBg : isOff ? tokens.warnBg : tokens.goodBg;
+          const isIssue = entry.status === "Issue Logged";
+          const statusTone = isStalled ? tokens.bad : (isOff || isIssue) ? tokens.warn : tokens.good;
+          const statusBg = isStalled ? tokens.badBg : (isOff || isIssue) ? tokens.warnBg : tokens.goodBg;
 
           return (
             <div
@@ -470,35 +482,69 @@ function DailyRecordTab({ project }) {
       </Panel>
 
       <Panel style={{ padding: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: tokens.slate, marginBottom: 12, textTransform: "uppercase" }}>
-          Inspection Role Compliance
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: tokens.slate, textTransform: "uppercase" }}>
+            Inspection Role Compliance
+          </div>
+          <span
+            style={{
+              fontSize: 10.5,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: tokens.radiusSm,
+              background: badgeBg,
+              color: badgeColor,
+              border: `1px solid ${badgeBorder}`,
+            }}
+          >
+            {complianceStats.passed}/{complianceStats.total} Compliant ({complianceStats.percentage}%)
+          </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {[
-            { role: "Site Engineer", status: "Verified Today", icon: CheckCircle2, color: tokens.good },
-            { role: "Sub Engineer", status: "Verified Yesterday", icon: CheckCircle2, color: tokens.good },
-            { role: "QA/QC Engineer", status: "Audit Pending (4d)", icon: Clock, color: tokens.warn },
-            { role: "Material Inspector", status: "Cert Verified", icon: CheckCircle2, color: tokens.good },
-          ].map((item, idx) => {
-            const Icon = item.icon;
+          {complianceList.map((item, idx) => {
+            const Icon = item.icon || CheckCircle2;
             return (
               <div
                 key={idx}
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   justifyContent: "space-between",
-                  padding: "8px 10px",
+                  padding: "10px 12px",
                   background: tokens.paper,
                   borderRadius: tokens.radiusSm,
-                  border: `1px solid ${tokens.line}`,
+                  border: `1px solid ${item.color === tokens.bad ? `${tokens.bad}44` : tokens.line}`,
+                  gap: 8,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Icon size={14} color={item.color} />
-                  <span style={{ fontSize: 12, fontWeight: 500, color: tokens.ink }}>{item.role}</span>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flex: 1 }}>
+                  <Icon size={15} color={item.color} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: tokens.ink }}>
+                      {item.role}
+                    </div>
+                    {item.detail && (
+                      <div style={{ fontSize: 10.5, color: tokens.slate, marginTop: 2, lineHeight: 1.3 }}>
+                        {item.detail}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <span style={{ fontSize: 11, color: tokens.slate }}>{item.status}</span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: item.color,
+                    background: item.color === tokens.bad ? tokens.badBg : item.color === tokens.warn ? tokens.warnBg : tokens.goodBg,
+                    padding: "2px 7px",
+                    borderRadius: tokens.radiusSm,
+                    flexShrink: 0,
+                    textAlign: "right",
+                    maxWidth: 160,
+                  }}
+                >
+                  {item.status}
+                </span>
               </div>
             );
           })}
