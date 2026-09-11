@@ -1,0 +1,110 @@
+:root {
+  --color-ink: #1B2430;
+  --color-paper: #F4F3EF;
+  --color-panel: #FFFFFF;
+  --color-line: #D9D6CE;
+  --color-steel: #2F5D73;
+  --color-steel-deep: #1F4351;
+  --color-slate: #5B6570;
+  --color-good: #3E7A52;
+  --color-warn: #B07C22;
+  --color-bad: #A6402F;
+  --color-good-bg: #EAF2EC;
+  --color-warn-bg: #FBF1E0;
+  --color-bad-bg: #F7E7E3;
+
+  --sidebar-width: 216px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Monospace data numbers utility */
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Hairline scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #E8E5DD;
+}
+::-webkit-scrollbar-thumb {
+  background: #C4C0B6;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A9A499;
+}
+
+/* Table header standards */
+.gov-table-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-slate);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Responsive Table Wrapper */
+.table-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+/* Form controls */
+button {
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Responsive adjustments for screens <= 1024px */
+@media (max-width: 1024px) {
+  .responsive-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  .responsive-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .responsive-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
