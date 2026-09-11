@@ -78,6 +78,30 @@ export function normalizeProject(p) {
 }
 
 /**
+ * Generate a unique project code based on sector and existing project list
+ */
+export function generateProjectCode(sector = "Roads", existingProjects = []) {
+  const prefixMap = {
+    Roads: "NH",
+    Bridges: "BR",
+    Railways: "RW",
+    Power: "PW",
+  };
+  const prefix = prefixMap[sector] || "PRJ";
+  const usedCodes = new Set(
+    (existingProjects || []).map((p) => (p.code || p.id || "").toUpperCase())
+  );
+  let candidate = "";
+  let attempts = 0;
+  do {
+    const num = Math.floor(1000 + Math.random() * 9000);
+    candidate = `${prefix}-${num}`;
+    attempts++;
+  } while (usedCodes.has(candidate) && attempts < 100);
+  return candidate;
+}
+
+/**
  * Get stored projects from localStorage or default mock projects
  */
 export function getStoredProjects() {
@@ -86,7 +110,32 @@ export function getStoredProjects() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map(normalizeProject);
+        const seenIds = new Set();
+        const seenCodes = new Set();
+        const validProjects = [];
+
+        for (const raw of parsed) {
+          const p = normalizeProject(raw);
+          if (!p) continue;
+
+          // Disambiguate duplicate codes if corrupted from previous sessions
+          let pCode = (p.code || p.id || "").toUpperCase();
+          if (seenCodes.has(pCode)) {
+            p.code = `${p.code}-${Math.floor(100 + Math.random() * 900)}`;
+            pCode = p.code.toUpperCase();
+          }
+          if (pCode) seenCodes.add(pCode);
+
+          // Disambiguate duplicate IDs
+          if (seenIds.has(p.id)) {
+            p.id = `${p.id}_${Math.floor(100 + Math.random() * 900)}`;
+          }
+          if (p.id) seenIds.add(p.id);
+
+          validProjects.push(p);
+        }
+
+        return validProjects;
       }
     }
   } catch (e) {
@@ -137,8 +186,13 @@ export async function fetchProjectsFromSupabase() {
     }
 
     const normalized = data.map(normalizeProject);
-    saveStoredProjects(normalized);
-    return { data: normalized, error: null };
+    // Keep any local-only projects that don't exist yet in Supabase
+    const dbCodes = new Set(normalized.map((p) => (p.code || p.id || "").toUpperCase()));
+    const localOnly = localProjects.filter((lp) => !dbCodes.has((lp.code || lp.id || "").toUpperCase()));
+    const merged = [...normalized, ...localOnly];
+
+    saveStoredProjects(merged);
+    return { data: merged, error: null };
   } catch (err) {
     console.error("fetchProjects exception:", err);
     return { data: localProjects, error: err };

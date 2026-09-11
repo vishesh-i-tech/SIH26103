@@ -258,8 +258,8 @@ export function Projects() {
             ) : (
               projects.map((p, i) => (
                 <div
-                  key={p.id}
-                  onClick={() => navigate(`/projects/${p.id}`)}
+                  key={p.id || p.code || `proj-${i}`}
+                  onClick={() => navigate(`/projects/${p.id || p.code}`)}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1.4fr 100px 1.1fr 1fr 1fr 120px 24px",

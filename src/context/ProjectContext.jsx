@@ -5,6 +5,7 @@ import {
   normalizeProject,
   getStoredProjects,
   saveStoredProjects,
+  generateProjectCode,
 } from "../utils/supabaseHelpers";
 
 const ProjectContext = createContext(null);
@@ -39,11 +40,29 @@ export function ProjectProvider({ children }) {
   const addProject = async (projectData, userId = null) => {
     const cost = Number(projectData.costOriginal) || 500;
     const duration = Number(projectData.duration) || 36;
-    const code = projectData.id?.trim() || `PRJ-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // Guaranteed unique identifier for the project
+    const uniqueId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `prj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    // Resolve project code and ensure it does not collide with any existing project
+    let rawCode = (projectData.id || projectData.code || "").trim();
+    if (!rawCode) {
+      rawCode = generateProjectCode(projectData.sector || "Roads", projects);
+    }
+    const existingCodes = new Set(
+      projects.map((p) => (p.code || p.id || "").toUpperCase())
+    );
+    let finalCode = rawCode;
+    if (existingCodes.has(finalCode.toUpperCase())) {
+      finalCode = `${finalCode}-${Math.floor(100 + Math.random() * 900)}`;
+    }
 
     const newProject = normalizeProject({
-      id: code,
-      code: code,
+      id: uniqueId,
+      code: finalCode,
       name: projectData.name?.trim() || "New Infrastructure Project",
       sector: projectData.sector || "Roads",
       location: projectData.location?.trim() || "State / Circle",
@@ -51,8 +70,8 @@ export function ProjectProvider({ children }) {
       cost_original: cost,
       cost_revised: cost,
       duration_months: duration,
-      start_date: "2026-11-01",
-      target_date: "2029-11-01",
+      start_date: projectData.start || "2026-11-01",
+      target_date: projectData.end || "2029-11-01",
       planned_progress: 0,
       actual_progress: 0,
       risk_score: 25,
@@ -75,9 +94,9 @@ export function ProjectProvider({ children }) {
       dailyEntries: [],
     });
 
-    // Save locally immediately so it persists across refreshes
+    // Save locally immediately so it persists across refreshes without deleting any existing projects
     setProjects((prev) => {
-      const updated = [newProject, ...prev.filter((p) => p.code !== code && p.id !== code)];
+      const updated = [newProject, ...prev.filter((p) => p.id !== uniqueId)];
       saveStoredProjects(updated);
       return updated;
     });
@@ -88,11 +107,11 @@ export function ProjectProvider({ children }) {
         const { data: newRow, error: insertErr } = await supabase
           .from("projects")
           .insert({
-            code,
-            name: projectData.name?.trim() || "New Infrastructure Project",
-            sector: projectData.sector || "Roads",
-            location: projectData.location?.trim() || "State / Circle",
-            contractor: projectData.contractor?.trim() || "Contractor Unassigned",
+            code: finalCode,
+            name: newProject.name,
+            sector: newProject.sector,
+            location: newProject.location,
+            contractor: newProject.contractor,
             cost_original: cost,
             cost_revised: cost,
             duration_months: duration,
@@ -101,8 +120,8 @@ export function ProjectProvider({ children }) {
             planned_progress: 0,
             actual_progress: 0,
             risk_score: 25,
-            reason: "Initial site mobilization & alignment survey stage",
-            recommendation: "Awaiting first ground entry from Field Officer.",
+            reason: newProject.reason,
+            recommendation: newProject.recommendation,
             days_flagged: 0,
             created_by: userId || null,
           })
@@ -127,7 +146,7 @@ export function ProjectProvider({ children }) {
 
           const savedSupabaseProject = normalizeProject(newRow);
           setProjects((prev) => {
-            const updated = [savedSupabaseProject, ...prev.filter((p) => p.code !== code && p.id !== code)];
+            const updated = prev.map((p) => (p.id === uniqueId ? savedSupabaseProject : p));
             saveStoredProjects(updated);
             return updated;
           });
@@ -142,7 +161,13 @@ export function ProjectProvider({ children }) {
   };
 
   const getProject = (idOrCode) => {
-    return projects.find((p) => p.id === idOrCode || p.code === idOrCode);
+    if (!idOrCode) return null;
+    const target = String(idOrCode).trim().toLowerCase();
+    return projects.find(
+      (p) =>
+        (p.id && String(p.id).trim().toLowerCase() === target) ||
+        (p.code && String(p.code).trim().toLowerCase() === target)
+    );
   };
 
   const sectors = ["All", ...new Set(projects.map((p) => p.sector).filter(Boolean))];

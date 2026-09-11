@@ -10,28 +10,31 @@ import {
   ShieldAlert,
   Info,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useProjects } from "../context/ProjectContext";
 import { useAuth } from "../context/AuthContext";
+import { generateProjectCode } from "../utils/supabaseHelpers";
 import Panel from "../components/Panel";
 
 export function NewProject() {
   const navigate = useNavigate();
-  const { addProject } = useProjects();
+  const { addProject, projects } = useProjects();
   const { user } = useAuth();
 
-  const [formData, setFormData] = useState({
-    id: "NH-7720",
-    name: "Gwalior–Jhansi Expressway Expansion (Pkg 3)",
+  const [formData, setFormData] = useState(() => ({
+    id: generateProjectCode("Roads", projects),
+    name: "",
     sector: "Roads",
-    location: "Madhya Pradesh",
-    contractor: "Larsen & Toubro Infra",
-    costOriginal: "850",
+    location: "",
+    contractor: "",
+    costOriginal: "",
     start: "Nov 2026",
     duration: "36",
     end: "Nov 2029",
-  });
+  }));
+  const [codeCustomized, setCodeCustomized] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,13 +43,32 @@ export function NewProject() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleSectorChange = (e) => {
+    const newSector = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      sector: newSector,
+      id: codeCustomized ? prev.id : generateProjectCode(newSector, projects),
+    }));
+  };
+
+  const handleRegenerateCode = () => {
+    const newCode = generateProjectCode(formData.sector, projects);
+    setFormData((prev) => ({ ...prev, id: newCode }));
+    setCodeCustomized(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.name.trim()) {
+      setErrorMsg("Please enter a Project Sanction Name.");
+      return;
+    }
     setErrorMsg("");
     setIsSubmitting(true);
     try {
       const created = await addProject(formData, user?.id);
-      navigate(`/projects/${created.id}`);
+      navigate("/projects");
     } catch (err) {
       console.error("Failed to onboard project:", err);
       setErrorMsg(err.message || "Failed to sanction project in database.");
@@ -150,14 +172,39 @@ export function NewProject() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 6 }}>
-                PROJECT CODE / ID *
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <label style={{ fontSize: 11.5, fontWeight: 600, color: tokens.slate }}>
+                  PROJECT CODE / ID *
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRegenerateCode}
+                  title="Generate new unique project code"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: tokens.steel,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: 0,
+                  }}
+                >
+                  <RefreshCw size={11} />
+                  <span>New Code</span>
+                </button>
+              </div>
               <input
                 type="text"
                 name="id"
                 value={formData.id}
-                onChange={handleChange}
+                onChange={(e) => {
+                  setCodeCustomized(true);
+                  handleChange(e);
+                }}
                 required
                 placeholder="e.g. NH-7720 or RW-5100"
                 style={{
@@ -184,7 +231,7 @@ export function NewProject() {
               <select
                 name="sector"
                 value={formData.sector}
-                onChange={handleChange}
+                onChange={handleSectorChange}
                 style={{
                   width: "100%",
                   padding: "9px 12px",
