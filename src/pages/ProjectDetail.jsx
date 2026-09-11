@@ -55,9 +55,35 @@ export function ProjectDetail() {
       setError(null);
 
       if (!isSupabaseConfigured()) {
-        const found = getProject(id) || projects[0];
-        if (mounted) {
-          setProject(found);
+        const found = getProject(id) || projects.find((p) => p.code === id || p.id === id) || projects[0];
+        if (mounted && found) {
+          let merged = found;
+          try {
+            const localSubmissions = JSON.parse(localStorage.getItem("paimana_submissions") || "[]");
+            const projectSubmissions = localSubmissions
+              .filter((s) => s.projectId === found.id || s.projectId === found.code)
+              .map((s) => ({
+                id: s.id,
+                date: s.date,
+                status: s.status,
+                reason: s.reason,
+                materials: s.materials,
+                notes: s.notes,
+                hasPhoto: s.hasPhoto,
+                photoName: s.photoName,
+                reviewStatus: s.reviewStatus,
+                submittedBy: s.submittedBy,
+              }));
+
+            if (projectSubmissions.length > 0) {
+              merged = {
+                ...found,
+                dailyEntries: [...projectSubmissions, ...(found.dailyEntries || [])],
+              };
+            }
+          } catch (e) {}
+
+          setProject(merged);
           setLoading(false);
         }
         return;

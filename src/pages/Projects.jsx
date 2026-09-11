@@ -80,7 +80,7 @@ export function Projects() {
 
   useEffect(() => {
     fetchFilteredProjects();
-  }, [selectedSector, search]);
+  }, [selectedSector, search, contextProjects]);
 
   return (
     <div style={{ padding: 28 }}>

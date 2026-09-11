@@ -18,33 +18,35 @@ export function normalizeProject(p) {
     }
   };
 
-  const trend = (p.risk_trend || []).map((t) => ({
+  const trend = (p.risk_trend || p.trend || []).map((t) => ({
     m: t.month_label || t.m,
     v: Number(t.risk_value ?? t.v ?? 0),
     recorded_at: t.recorded_at,
   }));
 
-  const factors = (p.risk_factors || []).map((f) => ({
+  const factors = (p.risk_factors || p.factors || []).map((f) => ({
     f: f.factor_text || f.f,
     w: Number(f.weight ?? f.w ?? 0),
   }));
 
-  const billing = (p.billing_entries || []).map((b) => ({
+  const billing = (p.billing_entries || p.billing || []).map((b) => ({
     id: b.bill_code || b.id,
     claimed: Number(b.claimed_amount ?? b.claimed ?? 0),
     expected: Number(b.expected_amount ?? b.expected ?? 0),
     status: b.status,
   }));
 
-  const daily = (p.daily_entries || []).map((d) => ({
+  const daily = (p.daily_entries || p.dailyEntries || []).map((d) => ({
     id: d.id,
-    date: d.entry_date ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d.entry_date)) : "Recent",
+    date: d.entry_date
+      ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d.entry_date))
+      : (d.date || "Recent"),
     status: d.work_status || d.status || "Running",
     reason: d.delay_reason || d.reason || "",
     materials: d.material_notes || d.materials || "None logged",
     notes: d.notes || "",
-    hasPhoto: Boolean(d.photo_url),
-    photoName: d.photo_url,
+    hasPhoto: Boolean(d.photo_url || d.hasPhoto),
+    photoName: d.photo_url || d.photoName,
     reviewStatus: d.reviewed_status || d.reviewStatus || "Pending Review",
     submittedBy: d.profiles?.full_name || d.submittedBy || "Site Engineer",
   }));
@@ -68,19 +70,50 @@ export function normalizeProject(p) {
     reason: p.reason || "Under routine site execution",
     recommendation: p.recommendation || "Maintain standard telemetry & verification logging.",
     daysFlagged: Number(p.days_flagged ?? p.daysFlagged ?? 0),
-    trend: trend.length > 0 ? trend : (p.trend || []),
-    factors: factors.length > 0 ? factors : (p.factors || []),
-    billing: billing.length > 0 ? billing : (p.billing || []),
+    trend: trend.length > 0 ? trend : [],
+    factors: factors.length > 0 ? factors : [],
+    billing: billing.length > 0 ? billing : [],
     dailyEntries: daily.length > 0 ? daily : [],
   };
 }
 
 /**
- * Fetch all projects from Supabase with fallback to mock data if not configured
+ * Get stored projects from localStorage or default mock projects
+ */
+export function getStoredProjects() {
+  try {
+    const saved = localStorage.getItem("paimana_projects");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(normalizeProject);
+      }
+    }
+  } catch (e) {
+    console.warn("Could not read local projects from storage:", e);
+  }
+  return mockProjects.map(normalizeProject);
+}
+
+/**
+ * Save projects into localStorage
+ */
+export function saveStoredProjects(projects) {
+  try {
+    localStorage.setItem("paimana_projects", JSON.stringify(projects));
+  } catch (e) {
+    console.warn("Could not save projects to storage:", e);
+  }
+}
+
+/**
+ * Fetch all projects from Supabase with fallback to local persistent storage
  */
 export async function fetchProjectsFromSupabase() {
+  const localProjects = getStoredProjects();
+
   if (!isSupabaseConfigured()) {
-    return { data: mockProjects.map(normalizeProject), error: null };
+    return { data: localProjects, error: null };
   }
 
   try {
@@ -96,16 +129,18 @@ export async function fetchProjectsFromSupabase() {
 
     if (error) {
       console.warn("Supabase fetchProjects error:", error);
-      return { data: mockProjects.map(normalizeProject), error };
+      return { data: localProjects, error };
     }
 
     if (!data || data.length === 0) {
-      return { data: mockProjects.map(normalizeProject), error: null };
+      return { data: localProjects, error: null };
     }
 
-    return { data: data.map(normalizeProject), error: null };
+    const normalized = data.map(normalizeProject);
+    saveStoredProjects(normalized);
+    return { data: normalized, error: null };
   } catch (err) {
     console.error("fetchProjects exception:", err);
-    return { data: mockProjects.map(normalizeProject), error: err };
+    return { data: localProjects, error: err };
   }
 }

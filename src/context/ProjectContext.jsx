@@ -1,12 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import { fetchProjectsFromSupabase, normalizeProject } from "../utils/supabaseHelpers";
-import { mockProjects } from "../data/mockProjects";
+import {
+  fetchProjectsFromSupabase,
+  normalizeProject,
+  getStoredProjects,
+  saveStoredProjects,
+} from "../utils/supabaseHelpers";
 
 const ProjectContext = createContext(null);
 
 export function ProjectProvider({ children }) {
-  const [projects, setProjects] = useState(() => mockProjects.map(normalizeProject));
+  const [projects, setProjects] = useState(() => getStoredProjects());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -18,7 +22,7 @@ export function ProjectProvider({ children }) {
       if (fetchErr && isSupabaseConfigured()) {
         setError(fetchErr.message || "Failed to load projects from Supabase.");
       }
-      if (data) {
+      if (data && data.length > 0) {
         setProjects(data);
       }
     } catch (err) {
@@ -37,96 +41,104 @@ export function ProjectProvider({ children }) {
     const duration = Number(projectData.duration) || 36;
     const code = projectData.id?.trim() || `PRJ-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    if (!isSupabaseConfigured()) {
-      // Local fallback if Supabase is not configured yet
-      const fallbackProject = normalizeProject({
-        id: code,
-        code: code,
-        name: projectData.name?.trim() || "New Infrastructure Project",
-        sector: projectData.sector || "Roads",
-        location: projectData.location?.trim() || "State / Circle",
-        contractor: projectData.contractor?.trim() || "Contractor Unassigned",
-        cost_original: cost,
-        cost_revised: cost,
-        duration_months: duration,
-        start_date: "2026-11-01",
-        target_date: "2029-11-01",
-        planned_progress: 0,
-        actual_progress: 0,
-        risk_score: 25,
-        reason: "Initial site mobilization & alignment survey stage",
-        recommendation: "Awaiting first ground entry from Field Officer.",
-        days_flagged: 0,
-        trend: [
-          { m: "Apr", v: 25 },
-          { m: "May", v: 25 },
-          { m: "Jun", v: 25 },
-          { m: "Jul", v: 25 },
-          { m: "Aug", v: 25 },
-          { m: "Sep", v: 25 },
-        ],
-        factors: [
-          { f: "Initial mobilization & survey", w: 60 },
-          { f: "Baseline statutory clearance", w: 40 },
-        ],
-        billing: [],
-      });
-      setProjects((prev) => [fallbackProject, ...prev]);
-      return fallbackProject;
+    const newProject = normalizeProject({
+      id: code,
+      code: code,
+      name: projectData.name?.trim() || "New Infrastructure Project",
+      sector: projectData.sector || "Roads",
+      location: projectData.location?.trim() || "State / Circle",
+      contractor: projectData.contractor?.trim() || "Contractor Unassigned",
+      cost_original: cost,
+      cost_revised: cost,
+      duration_months: duration,
+      start_date: "2026-11-01",
+      target_date: "2029-11-01",
+      planned_progress: 0,
+      actual_progress: 0,
+      risk_score: 25,
+      reason: "Initial site mobilization & alignment survey stage",
+      recommendation: "Awaiting first ground entry from Field Officer.",
+      days_flagged: 0,
+      trend: [
+        { m: "Apr", v: 25 },
+        { m: "May", v: 25 },
+        { m: "Jun", v: 25 },
+        { m: "Jul", v: 25 },
+        { m: "Aug", v: 25 },
+        { m: "Sep", v: 25 },
+      ],
+      factors: [
+        { f: "Initial mobilization & survey", w: 60 },
+        { f: "Baseline statutory clearance", w: 40 },
+      ],
+      billing: [],
+      dailyEntries: [],
+    });
+
+    // Save locally immediately so it persists across refreshes
+    setProjects((prev) => {
+      const updated = [newProject, ...prev.filter((p) => p.code !== code && p.id !== code)];
+      saveStoredProjects(updated);
+      return updated;
+    });
+
+    // If Supabase is configured, also persist to PostgreSQL
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: newRow, error: insertErr } = await supabase
+          .from("projects")
+          .insert({
+            code,
+            name: projectData.name?.trim() || "New Infrastructure Project",
+            sector: projectData.sector || "Roads",
+            location: projectData.location?.trim() || "State / Circle",
+            contractor: projectData.contractor?.trim() || "Contractor Unassigned",
+            cost_original: cost,
+            cost_revised: cost,
+            duration_months: duration,
+            start_date: "2026-11-01",
+            target_date: "2029-11-01",
+            planned_progress: 0,
+            actual_progress: 0,
+            risk_score: 25,
+            reason: "Initial site mobilization & alignment survey stage",
+            recommendation: "Awaiting first ground entry from Field Officer.",
+            days_flagged: 0,
+            created_by: userId || null,
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.warn("Notice: Supabase insert returned error, retained in local storage:", insertErr);
+        } else if (newRow?.id) {
+          const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep"];
+          const trendInserts = months.map((m) => ({
+            project_id: newRow.id,
+            month_label: m,
+            risk_value: 25,
+          }));
+          await supabase.from("risk_trend").insert(trendInserts);
+
+          await supabase.from("risk_factors").insert([
+            { project_id: newRow.id, factor_text: "Initial mobilization & survey", weight: 60 },
+            { project_id: newRow.id, factor_text: "Baseline statutory clearance", weight: 40 },
+          ]);
+
+          const savedSupabaseProject = normalizeProject(newRow);
+          setProjects((prev) => {
+            const updated = [savedSupabaseProject, ...prev.filter((p) => p.code !== code && p.id !== code)];
+            saveStoredProjects(updated);
+            return updated;
+          });
+          return savedSupabaseProject;
+        }
+      } catch (err) {
+        console.warn("Could not insert project to Supabase, persisted in local storage:", err);
+      }
     }
 
-    try {
-      // Insert into projects table
-      const { data: newRow, error: insertErr } = await supabase
-        .from("projects")
-        .insert({
-          code,
-          name: projectData.name?.trim() || "New Infrastructure Project",
-          sector: projectData.sector || "Roads",
-          location: projectData.location?.trim() || "State / Circle",
-          contractor: projectData.contractor?.trim() || "Contractor Unassigned",
-          cost_original: cost,
-          cost_revised: cost,
-          duration_months: duration,
-          start_date: "2026-11-01",
-          target_date: "2029-11-01",
-          planned_progress: 0,
-          actual_progress: 0,
-          risk_score: 25,
-          reason: "Initial site mobilization & alignment survey stage",
-          recommendation: "Awaiting first ground entry from Field Officer.",
-          days_flagged: 0,
-          created_by: userId || null,
-        })
-        .select()
-        .single();
-
-      if (insertErr) {
-        throw insertErr;
-      }
-
-      // Insert baseline risk_trend and risk_factors
-      if (newRow?.id) {
-        const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep"];
-        const trendInserts = months.map((m) => ({
-          project_id: newRow.id,
-          month_label: m,
-          risk_value: 25,
-        }));
-        await supabase.from("risk_trend").insert(trendInserts);
-
-        await supabase.from("risk_factors").insert([
-          { project_id: newRow.id, factor_text: "Initial mobilization & survey", weight: 60 },
-          { project_id: newRow.id, factor_text: "Baseline statutory clearance", weight: 40 },
-        ]);
-      }
-
-      await loadProjects();
-      return normalizeProject(newRow);
-    } catch (err) {
-      console.error("Error adding project to Supabase:", err);
-      throw err;
-    }
+    return newProject;
   };
 
   const getProject = (idOrCode) => {
