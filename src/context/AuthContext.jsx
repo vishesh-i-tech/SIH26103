@@ -223,6 +223,23 @@ export function AuthProvider({ children }) {
     setProfile(null);
   };
 
+  // Instant seamless role switcher for demo and evaluation
+  const switchRole = (newRole) => {
+    const roleName = newRole === "field_officer" || newRole === "field" ? "field_officer" : "admin";
+    const name = roleName === "admin" ? "Vishesh indorkar (MoSPI Admin)" : "harshal shinde (Field Officer)";
+    const email = roleName === "admin" ? "vishu@mospi.gov.in" : "field.officer@mospi.gov.in";
+    const id = roleName === "admin" ? "6b70c5b1-2014-42b7-b1f4-06489af1ec0f" : "b3834545-6334-4448-9c3f-5b758fc85880";
+
+    const newProfile = { id, full_name: name, role: roleName };
+    const newUser = { id, email, user_metadata: { role: roleName, full_name: name } };
+
+    setProfile(newProfile);
+    setUser(newUser);
+    localStorage.setItem("paimana_role", roleName);
+    localStorage.setItem("paimana_officer", name);
+    return { user: newUser, role: roleName };
+  };
+
   // Normalized role values: 'admin' or 'field_officer'
   const normalizedRole = profile?.role === "field" ? "field_officer" : (profile?.role || null);
   const officerName = profile?.full_name || (normalizedRole === "field_officer" ? "Field Officer" : "MoSPI Admin");
@@ -239,6 +256,7 @@ export function AuthProvider({ children }) {
         signIn,
         signUp,
         logout,
+        switchRole,
         fetchProfile,
         isConfigured: isSupabaseConfigured(),
       }}

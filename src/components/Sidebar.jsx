@@ -35,10 +35,16 @@ const fieldNavItems = [
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { role, logout, officerName } = useAuth();
+  const { role, logout, officerName, switchRole } = useAuth();
 
   const isField = role === "field_officer" || role === "field";
   const navItems = isField ? fieldNavItems : adminNavItems;
+
+  const handleToggleRole = () => {
+    const nextRole = isField ? "admin" : "field_officer";
+    switchRole(nextRole);
+    navigate(isField ? "/dashboard" : "/field-dashboard");
+  };
 
   const handleSwitchUser = async () => {
     await logout();
@@ -156,6 +162,29 @@ export function Sidebar() {
         </div>
 
         <button
+          onClick={handleToggleRole}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "8px 10px",
+            background: isField ? "rgba(56, 189, 248, 0.12)" : "rgba(245, 158, 11, 0.12)",
+            border: `1px solid ${isField ? "#38BDF8" : "#F59E0B"}44`,
+            color: isField ? "#38BDF8" : "#F59E0B",
+            fontSize: 11.5,
+            cursor: "pointer",
+            borderRadius: tokens.radiusSm,
+            fontWeight: 600,
+            transition: "all 0.15s ease",
+          }}
+          title={isField ? "Switch to MoSPI Admin Executive View" : "Switch to Field Officer Site Telemetry View"}
+        >
+          {isField ? <ShieldCheck size={14} /> : <HardHat size={14} />}
+          <span>{isField ? "Switch to Admin View ⇄" : "Switch to Field Officer ⇄"}</span>
+        </button>
+
+        <button
           onClick={handleSwitchUser}
           style={{
             display: "flex",
@@ -172,10 +201,10 @@ export function Sidebar() {
             fontWeight: 500,
             transition: "background 0.15s ease",
           }}
-          title="Switch User / Login and reset role session"
+          title="Sign out and return to login"
         >
           <LogOut size={13} color="#8B94A0" />
-          <span>Switch User / Login</span>
+          <span>Sign Out / Return to Login</span>
         </button>
       </div>
     </aside>

@@ -7,7 +7,7 @@ import Panel from "../components/Panel";
 
 export function Login() {
   const navigate = useNavigate();
-  const { signIn, isConfigured } = useAuth();
+  const { signIn, isConfigured, switchRole } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +59,7 @@ export function Login() {
   // Quick helper to fill demo credentials if needed
   const fillDemo = (roleKey) => {
     if (roleKey === "admin") {
-      setEmail("admin@mospi.gov.in");
+      setEmail("vishu@mospi.gov.in");
       setPassword("MoSPI@Admin2026");
     } else {
       setEmail("field.officer@mospi.gov.in");
@@ -110,6 +110,109 @@ export function Login() {
 
         {/* Login Box */}
         <Panel style={{ padding: "28px 24px" }}>
+          {/* Quick 1-Click Role Direct Access */}
+          <div style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: tokens.slate,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: 10,
+              }}
+            >
+              Instant 1-Click Role Switch
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  switchRole("admin");
+                  navigate("/dashboard");
+                }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 4,
+                  padding: "12px 14px",
+                  background: "rgba(56, 189, 248, 0.08)",
+                  border: `1.5px solid ${tokens.steel}`,
+                  borderRadius: tokens.radiusSm,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.16)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.08)")}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Shield size={16} color={tokens.steel} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: tokens.ink }}>MoSPI Admin</span>
+                  </div>
+                  <ArrowRight size={13} color={tokens.steel} />
+                </div>
+                <div style={{ fontSize: 11, color: tokens.slate, lineHeight: 1.2 }}>
+                  Executive Portfolio View
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  switchRole("field_officer");
+                  navigate("/field-dashboard");
+                }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 4,
+                  padding: "12px 14px",
+                  background: "rgba(245, 158, 11, 0.08)",
+                  border: `1.5px solid ${tokens.warn}`,
+                  borderRadius: tokens.radiusSm,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(245, 158, 11, 0.16)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(245, 158, 11, 0.08)")}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <HardHat size={16} color={tokens.warn} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: tokens.ink }}>Field Officer</span>
+                  </div>
+                  <ArrowRight size={13} color={tokens.warn} />
+                </div>
+                <div style={{ fontSize: 11, color: tokens.slate, lineHeight: 1.2 }}>
+                  Site Telemetry View
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              margin: "18px 0 16px",
+              color: tokens.slate,
+              fontSize: 10.5,
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: tokens.line }} />
+            <span>OR SIGN IN WITH PASSWORD</span>
+            <div style={{ flex: 1, height: 1, background: tokens.line }} />
+          </div>
+
           <form onSubmit={handleSubmit}>
             <div style={{ fontSize: 14, fontWeight: 700, color: tokens.ink, marginBottom: 16 }}>
               Officer Sign In
