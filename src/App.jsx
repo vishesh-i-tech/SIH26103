@@ -13,6 +13,7 @@ import PriorityQueue from "./pages/PriorityQueue";
 import Benchmarking from "./pages/Benchmarking";
 import BillingAlerts from "./pages/BillingAlerts";
 import Assistant from "./pages/Assistant";
+import Simulator from "./pages/Simulator";
 import FieldDashboard from "./pages/FieldDashboard";
 import FieldTasks from "./pages/FieldTasks";
 import FieldEntry from "./pages/FieldEntry";
@@ -154,6 +155,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute allowedRole="admin">
               <Assistant />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="simulator"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <Simulator />
             </ProtectedRoute>
           }
         />

@@ -1,9 +1,4 @@
-/**
- * PAIMANA AI — Synthetic MoSPI Infrastructure Projects Dataset (ML & SHAP Synchronized)
- * Central Sector Projects (₹150 Cr+) across Roads, Bridges, Railways, and Power
- */
-
-export const mockProjects = [
+[
   {
     "id": "NH-4471",
     "code": "NH-4471",
@@ -1020,8 +1015,4 @@ export const mockProjects = [
       "reconciled": true
     }
   }
-];
-
-export const sectors = ["All", ...new Set(mockProjects.map((p) => p.sector))];
-
-export default mockProjects;
+]

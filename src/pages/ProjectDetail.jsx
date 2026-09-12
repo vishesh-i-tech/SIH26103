@@ -42,6 +42,7 @@ import {
 import Panel from "../components/Panel";
 import RiskChip from "../components/RiskChip";
 import ProgressBar from "../components/ProgressBar";
+import WhatIfSimulator from "../components/WhatIfSimulator";
 
 export function ProjectDetail() {
   const { id } = useParams();
@@ -145,6 +146,7 @@ export function ProjectDetail() {
     { id: "risk-prediction", label: "Risk & Prediction" },
     { id: "billing", label: "Billing Verification" },
     { id: "benchmark", label: "Benchmarking" },
+    { id: "what-if", label: "What-If Simulator" },
   ];
 
   return (
@@ -282,6 +284,7 @@ export function ProjectDetail() {
       {activeTab === "risk-prediction" && <RiskPredictionTab project={project} />}
       {activeTab === "billing" && <BillingTab project={project} />}
       {activeTab === "benchmark" && <BenchmarkTab project={project} />}
+      {activeTab === "what-if" && <WhatIfSimulator projectId={project.id || project.code} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   GitCompareArrows,
   ReceiptText,
   Bot,
+  SlidersHorizontal,
   ShieldCheck,
   HardHat,
   ClipboardList,
@@ -22,6 +23,7 @@ const adminNavItems = [
   { to: "/priority-queue", label: "Priority Queue", icon: ListOrdered },
   { to: "/benchmarking", label: "Benchmarking", icon: GitCompareArrows },
   { to: "/billing-alerts", label: "Billing Alerts", icon: ReceiptText },
+  { to: "/simulator", label: "What-If Simulator", icon: SlidersHorizontal },
   { to: "/assistant", label: "AI Assistant", icon: Bot },
 ];
 
