@@ -53,44 +53,47 @@ Row-Level Security (RLS) is active on all tables.
 
 ---
 
-## Getting Started
+## ⚡ Quick Start (1-Minute Zero-Config Run)
 
-### 1. Clone & Install Dependencies
+You **do NOT need Supabase or complex database setup** to evaluate this prototype! The app includes a built-in high-fidelity local simulation mode with all 10 benchmark MoSPI projects.
+
+### 1. Clone & Run Frontend (Instant Demo)
 ```bash
 git clone https://github.com/vishesh-i-tech/SIH26103.git
 cd SIH26103
 npm install
-```
-
-### 2. Configure Environment Variables
-Copy the `.env.example` template:
-```bash
-cp .env.example .env
-```
-Update `.env` with your Supabase project credentials:
-```env
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-### 3. Setup Database Schema & Seed Data
-Follow the step-by-step instructions in [**`SETUP.md`**](./SETUP.md) to:
-- Run `supabase/schema.sql` in your Supabase SQL Editor.
-- Run `supabase/seed.sql` to import the 10 Central Sector synthetic projects dataset.
-
-### 4. Run Development Server
-```bash
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-### 5. Production Build
-```bash
-npm run build
-```
+👉 Open [http://localhost:5173](http://localhost:5173) in your browser.  
+Click **"Sign In as Admin"** or **"Sign In as Field Officer"** on the login page to immediately explore the entire platform!
 
 ---
 
-## Complete Setup & Testing Guide
+### 2. Optional: Run Python ML Simulator API (For Live Counterfactual SHAP Engine)
+If you want to run the real XGBoost + SHAP TreeExplainer simulator backend locally:
+```bash
+cd ml
+pip install -r requirements.txt
+python server.py
+```
+👉 The simulator API will be live at [http://localhost:8000](http://localhost:8000) (Interactive Swagger docs at `http://localhost:8000/docs`).
 
-For detailed instructions on Supabase setup, creating Admin/Field Officer accounts, and executing end-to-end verification tests, see [**`SETUP.md`**](./SETUP.md).
+---
+
+### 3. Optional: Connect Live Supabase PostgreSQL (For Cloud Persistence)
+*(Only needed if you want multi-device cloud database sync)*
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Put your Supabase URL & Anon Key in `.env`.
+3. Run `supabase/schema.sql` and `supabase/seed.sql` in your Supabase SQL Editor.
+4. Detailed cloud setup instructions are in [**`SETUP.md`**](./SETUP.md).
+
+---
+
+## 📚 Complete Documentation & Presentation
+- **Master Platform Manual:** [**`COMPLETE_PLATFORM_DOCUMENTATION.md`**](./COMPLETE_PLATFORM_DOCUMENTATION.md) (Detailed feature breakdown for both MoSPI Admin and Field Officer roles).
+- **Presentation Deck:** [**`PAIMANA_AI_SIH26103_Presentation.pptx`**](./PAIMANA_AI_SIH26103_Presentation.pptx) (10-slide executive pitch deck).
+- **Model Card & Data Governance:** [**`model_card.md`**](./model_card.md) (XGBoost Model B & synthetic calibration disclosure).
+- **Video Demo Script:** [**`DEMO_SCRIPT.md`**](./DEMO_SCRIPT.md) (3-minute Hinglish narration screenplay).
