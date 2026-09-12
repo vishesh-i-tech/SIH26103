@@ -36,6 +36,7 @@ export function PriorityQueue() {
         `)
         .order("risk_score", { ascending: false });
 
+      console.log("[PriorityQueue.jsx / Supabase Query: projects, risk_trend, risk_factors]", { data, error: qErr });
       if (qErr) throw qErr;
 
       setProjects((data || []).map(normalizeProject));

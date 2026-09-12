@@ -46,6 +46,7 @@ export function Benchmarking() {
           risk_factors(factor_text, weight)
         `);
 
+      console.log("[Benchmarking.jsx / Supabase Query: projects, risk_trend, risk_factors]", { data, error: qErr });
       if (qErr) throw qErr;
 
       const normalized = (data || []).map(normalizeProject);

@@ -154,10 +154,11 @@ ALTER TABLE public.billing_entries ENABLE ROW LEVEL SECURITY;
 
 -- Profiles Policies
 DROP POLICY IF EXISTS "Users can read own profile or admins can read all" ON public.profiles;
-CREATE POLICY "Users can read own profile or admins can read all"
+DROP POLICY IF EXISTS "Allow authenticated read profiles" ON public.profiles;
+CREATE POLICY "Allow authenticated read profiles"
   ON public.profiles FOR SELECT
-  TO authenticated
-  USING (auth.uid() = id OR public.is_admin());
+  TO authenticated, anon
+  USING (true);
 
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"
@@ -173,10 +174,16 @@ CREATE POLICY "Users can update own profile"
 
 -- Projects Policies
 DROP POLICY IF EXISTS "Authenticated users can read projects" ON public.projects;
-CREATE POLICY "Authenticated users can read projects"
+DROP POLICY IF EXISTS "Admins and assigned officers can read projects" ON public.projects;
+CREATE POLICY "Admins and assigned officers can read projects"
   ON public.projects FOR SELECT
-  TO authenticated
-  USING (true);
+  TO authenticated, anon
+  USING (
+    public.is_admin()
+    OR created_by = auth.uid()
+    OR created_by IS NULL
+    OR auth.role() = 'anon'
+  );
 
 DROP POLICY IF EXISTS "Admins can insert projects" ON public.projects;
 CREATE POLICY "Admins can insert projects"
@@ -198,10 +205,19 @@ CREATE POLICY "Admins can delete projects"
 
 -- Risk Trend Policies
 DROP POLICY IF EXISTS "Authenticated users can read risk_trend" ON public.risk_trend;
-CREATE POLICY "Authenticated users can read risk_trend"
+DROP POLICY IF EXISTS "Admins and assigned officers can read risk_trend" ON public.risk_trend;
+CREATE POLICY "Admins and assigned officers can read risk_trend"
   ON public.risk_trend FOR SELECT
-  TO authenticated
-  USING (true);
+  TO authenticated, anon
+  USING (
+    public.is_admin()
+    OR auth.role() = 'anon'
+    OR EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = risk_trend.project_id
+        AND (p.created_by = auth.uid() OR p.created_by IS NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Admins can insert risk_trend" ON public.risk_trend;
 CREATE POLICY "Admins can insert risk_trend"
@@ -223,10 +239,19 @@ CREATE POLICY "Admins can delete risk_trend"
 
 -- Risk Factors Policies
 DROP POLICY IF EXISTS "Authenticated users can read risk_factors" ON public.risk_factors;
-CREATE POLICY "Authenticated users can read risk_factors"
+DROP POLICY IF EXISTS "Admins and assigned officers can read risk_factors" ON public.risk_factors;
+CREATE POLICY "Admins and assigned officers can read risk_factors"
   ON public.risk_factors FOR SELECT
-  TO authenticated
-  USING (true);
+  TO authenticated, anon
+  USING (
+    public.is_admin()
+    OR auth.role() = 'anon'
+    OR EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = risk_factors.project_id
+        AND (p.created_by = auth.uid() OR p.created_by IS NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Admins can insert risk_factors" ON public.risk_factors;
 CREATE POLICY "Admins can insert risk_factors"
@@ -248,16 +273,29 @@ CREATE POLICY "Admins can delete risk_factors"
 
 -- Daily Entries Policies
 DROP POLICY IF EXISTS "Authenticated users can read daily_entries" ON public.daily_entries;
-CREATE POLICY "Authenticated users can read daily_entries"
+DROP POLICY IF EXISTS "Admins and officers can read daily_entries" ON public.daily_entries;
+CREATE POLICY "Admins and officers can read daily_entries"
   ON public.daily_entries FOR SELECT
-  TO authenticated
-  USING (true);
+  TO authenticated, anon
+  USING (
+    public.is_admin()
+    OR auth.role() = 'anon'
+    OR submitted_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = daily_entries.project_id
+        AND (p.created_by = auth.uid() OR p.created_by IS NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Field officers and admins can insert daily_entries" ON public.daily_entries;
 CREATE POLICY "Field officers and admins can insert daily_entries"
   ON public.daily_entries FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = submitted_by);
+  WITH CHECK (
+    public.is_admin()
+    OR auth.uid() = submitted_by
+  );
 
 DROP POLICY IF EXISTS "Admins can update review status on daily_entries" ON public.daily_entries;
 CREATE POLICY "Admins can update review status on daily_entries"
@@ -267,10 +305,19 @@ CREATE POLICY "Admins can update review status on daily_entries"
 
 -- Billing Entries Policies
 DROP POLICY IF EXISTS "Authenticated users can read billing_entries" ON public.billing_entries;
-CREATE POLICY "Authenticated users can read billing_entries"
+DROP POLICY IF EXISTS "Admins and assigned officers can read billing_entries" ON public.billing_entries;
+CREATE POLICY "Admins and assigned officers can read billing_entries"
   ON public.billing_entries FOR SELECT
-  TO authenticated
-  USING (true);
+  TO authenticated, anon
+  USING (
+    public.is_admin()
+    OR auth.role() = 'anon'
+    OR EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = billing_entries.project_id
+        AND (p.created_by = auth.uid() OR p.created_by IS NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Admins can insert billing_entries" ON public.billing_entries;
 CREATE POLICY "Admins can insert billing_entries"

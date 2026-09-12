@@ -62,6 +62,7 @@ export function Projects() {
       query = query.order("created_at", { ascending: false });
 
       const { data, error: qErr } = await query;
+      console.log("[Projects.jsx / Supabase Query: projects, risk_trend, risk_factors, billing_entries]", { data, error: qErr });
 
       if (qErr) {
         throw qErr;

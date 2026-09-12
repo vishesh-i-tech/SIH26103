@@ -176,6 +176,8 @@ export async function fetchProjectsFromSupabase() {
       `)
       .order("created_at", { ascending: false });
 
+    console.log("[supabaseHelpers / Supabase Query: projects, risk_trend, risk_factors, billing_entries]", { data, error });
+
     if (error) {
       console.warn("Supabase fetchProjects error:", error);
       return { data: localProjects, error };

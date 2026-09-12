@@ -56,6 +56,7 @@ export function BillingAlerts() {
         .eq("status", "flagged")
         .order("created_at", { ascending: false });
 
+      console.log("[BillingAlerts.jsx / Supabase Query: billing_entries]", { data, error: qErr });
       if (qErr) throw qErr;
 
       setFlaggedItems(data || []);

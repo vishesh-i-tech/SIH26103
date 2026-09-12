@@ -20,6 +20,7 @@ export function ProjectProvider({ children }) {
     setError(null);
     try {
       const { data, error: fetchErr } = await fetchProjectsFromSupabase();
+      console.log("[ProjectContext / Supabase Query: projects]", { data, error: fetchErr });
       if (fetchErr && isSupabaseConfigured()) {
         setError(fetchErr.message || "Failed to load projects from Supabase.");
       }
