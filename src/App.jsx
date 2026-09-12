@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
 import Layout from "./components/Layout";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -85,13 +86,15 @@ function ProtectedRoute({ allowedRole, children }) {
 export function AppRoutes() {
   return (
     <Routes>
-      {/* Unauthenticated Routes */}
+      {/* Public Landing Page */}
+      <Route path="/" element={<Landing />} />
+
+      {/* Unauthenticated Auth Portals */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
       {/* Authenticated Application Shell */}
-      <Route path="/" element={<Layout />}>
-        <Route index element={<IndexRedirect />} />
+      <Route element={<Layout />}>
 
         {/* MoSPI Admin Routes */}
         <Route

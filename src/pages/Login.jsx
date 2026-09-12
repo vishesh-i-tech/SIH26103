@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Shield, HardHat, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useAuth } from "../context/AuthContext";
@@ -7,12 +7,23 @@ import Panel from "../components/Panel";
 
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedRole = searchParams.get("role"); // "admin" or "field_officer"
   const { signIn, isConfigured, switchRole } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-select role and prefill demo credentials if specified in URL query
+  useEffect(() => {
+    if (requestedRole === "admin") {
+      fillDemo("admin");
+    } else if (requestedRole === "field_officer" || requestedRole === "field") {
+      fillDemo("field");
+    }
+  }, [requestedRole]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -138,15 +149,17 @@ export function Login() {
                   alignItems: "flex-start",
                   gap: 4,
                   padding: "12px 14px",
-                  background: "rgba(56, 189, 248, 0.08)",
-                  border: `1.5px solid ${tokens.steel}`,
+                  background: requestedRole === "admin" ? "rgba(47, 93, 115, 0.14)" : "rgba(56, 189, 248, 0.08)",
+                  border: requestedRole === "admin" ? `2px solid ${tokens.steel}` : `1.5px solid ${tokens.steel}`,
+                  boxShadow: requestedRole === "admin" ? `0 0 0 3px rgba(47, 93, 115, 0.2)` : "none",
                   borderRadius: tokens.radiusSm,
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "all 0.15s ease",
+                  position: "relative",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.16)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.08)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = requestedRole === "admin" ? "rgba(47, 93, 115, 0.14)" : "rgba(56, 189, 248, 0.08)")}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -156,7 +169,7 @@ export function Login() {
                   <ArrowRight size={13} color={tokens.steel} />
                 </div>
                 <div style={{ fontSize: 11, color: tokens.slate, lineHeight: 1.2 }}>
-                  Executive Portfolio View
+                  {requestedRole === "admin" ? "★ Pre-selected from Landing" : "Executive Portfolio View"}
                 </div>
               </button>
 
@@ -172,15 +185,17 @@ export function Login() {
                   alignItems: "flex-start",
                   gap: 4,
                   padding: "12px 14px",
-                  background: "rgba(245, 158, 11, 0.08)",
-                  border: `1.5px solid ${tokens.warn}`,
+                  background: (requestedRole === "field_officer" || requestedRole === "field") ? "rgba(245, 158, 11, 0.16)" : "rgba(245, 158, 11, 0.08)",
+                  border: (requestedRole === "field_officer" || requestedRole === "field") ? `2px solid ${tokens.warn}` : `1.5px solid ${tokens.warn}`,
+                  boxShadow: (requestedRole === "field_officer" || requestedRole === "field") ? `0 0 0 3px rgba(245, 158, 11, 0.2)` : "none",
                   borderRadius: tokens.radiusSm,
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "all 0.15s ease",
+                  position: "relative",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(245, 158, 11, 0.16)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(245, 158, 11, 0.08)")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(245, 158, 11, 0.2)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = (requestedRole === "field_officer" || requestedRole === "field") ? "rgba(245, 158, 11, 0.16)" : "rgba(245, 158, 11, 0.08)")}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -190,7 +205,7 @@ export function Login() {
                   <ArrowRight size={13} color={tokens.warn} />
                 </div>
                 <div style={{ fontSize: 11, color: tokens.slate, lineHeight: 1.2 }}>
-                  Site Telemetry View
+                  {(requestedRole === "field_officer" || requestedRole === "field") ? "★ Pre-selected from Landing" : "Site Telemetry View"}
                 </div>
               </button>
             </div>
