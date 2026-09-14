@@ -17,6 +17,7 @@ import {
   Clock,
   Layers,
   MapPin,
+  Users,
 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { riskTone, riskLabel, formatINR } from "../utils/risk";
@@ -85,13 +86,37 @@ export function Dashboard() {
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Page Title & Scope */}
-      <div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: tokens.ink }}>
-          Central Sector Portfolio Overview
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: tokens.ink }}>
+            Central Sector Portfolio Overview
+          </div>
+          <div style={{ fontSize: 12.5, color: tokens.slate, marginTop: 2 }}>
+            Real-time risk scoring, milestone variance & anomaly detection for ₹150 Cr+ central infrastructure projects.
+          </div>
         </div>
-        <div style={{ fontSize: 12.5, color: tokens.slate, marginTop: 2 }}>
-          Real-time risk scoring, milestone variance & anomaly detection for ₹150 Cr+ central infrastructure projects.
-        </div>
+
+        <Link
+          to="/officers"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "7px 14px",
+            background: "#EEF2FF",
+            border: "1px solid #C7D2FE",
+            borderRadius: tokens.radiusSm,
+            fontSize: 12,
+            color: "#3730A3",
+            fontWeight: 600,
+            textDecoration: "none",
+            boxShadow: "0 1px 3px rgba(99, 102, 241, 0.12)",
+          }}
+        >
+          <Users size={14} color="#4F46E5" />
+          <span>MoSPI Cadre: 8 Officers Active</span>
+          <ArrowRight size={12} color="#4F46E5" />
+        </Link>
       </div>
 
       {/* KPI Metric Panels */}

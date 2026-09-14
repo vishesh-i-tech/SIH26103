@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Send,
   LogOut,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import PaimanaBrand from "./PaimanaBrand";
@@ -102,6 +103,18 @@ const adminNavItems = [
     borderActive: "#D946EF",
     shadowActive: "rgba(217, 70, 239, 0.3)",
     isSpecialAi: true,
+  },
+  {
+    to: "/officers",
+    label: "Officers Directory",
+    icon: Users,
+    textColor: "#3730A3",
+    iconColor: "#4F46E5",
+    bgNormal: "#EEF2FF",
+    borderNormal: "#C7D2FE",
+    bgActive: "#E0E7FF",
+    borderActive: "#6366F1",
+    shadowActive: "rgba(99, 102, 241, 0.25)",
   },
 ];
 

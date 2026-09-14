@@ -15,6 +15,7 @@ import Benchmarking from "./pages/Benchmarking";
 import BillingAlerts from "./pages/BillingAlerts";
 import Assistant from "./pages/Assistant";
 import Simulator from "./pages/Simulator";
+import OfficersDirectory from "./pages/OfficersDirectory";
 import FieldDashboard from "./pages/FieldDashboard";
 import FieldTasks from "./pages/FieldTasks";
 import FieldEntry from "./pages/FieldEntry";
@@ -166,6 +167,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute allowedRole="admin">
               <Simulator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="officers"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <OfficersDirectory />
             </ProtectedRoute>
           }
         />

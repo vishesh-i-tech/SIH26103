@@ -14,6 +14,7 @@ import {
   Send,
   LogOut,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -25,6 +26,7 @@ const adminNavItems = [
   { to: "/billing-alerts", label: "Billing Alerts", icon: ReceiptText },
   { to: "/simulator", label: "What-If Simulator", icon: SlidersHorizontal },
   { to: "/assistant", label: "AI Assistant", icon: Bot },
+  { to: "/officers", label: "Officers", icon: Users },
 ];
 
 const fieldNavItems = [
