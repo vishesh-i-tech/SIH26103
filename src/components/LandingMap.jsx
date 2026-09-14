@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import { tokens, monoStyle } from "../styles/tokens";
-import { Shield, Layers, TrendingUp, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Shield, Layers, TrendingUp, AlertTriangle, CheckCircle, Info, Lock } from "lucide-react";
 
 // Local GeoJSON loaded directly (source: adarshbiradar/maps-geojson)
 const INDIA_GEO_URL = "/india.json";
@@ -18,6 +18,18 @@ function normalizeStateName(name) {
 export function LandingMap({ projects = [] }) {
   const [hoveredState, setHoveredState] = useState(null);
   const [selectedState, setSelectedState] = useState("Madhya Pradesh");
+  const [tooltip, setTooltip] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const mapContainerRef = useRef(null);
+
+  const handleContainerMouseMove = (e) => {
+    if (!mapContainerRef.current) return;
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    setTooltipPos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
 
   // Aggregate project telemetry by state
   const stateStats = useMemo(() => {
@@ -42,21 +54,31 @@ export function LandingMap({ projects = [] }) {
       entry.riskSum += Number(p.risk || p.risk_score || 0);
     });
 
-    // Compute averages
+    // Distinct signature colors for states with active projects
+    const stateColorPalette = {
+      madhyapradesh: "#E05D44",  // Coral / Red (4 central corridors)
+      uttarpradesh: "#F39C12",   // Amber / Gold (Lucknow Exp & DFC)
+      maharashtra: "#C0392B",    // Crimson (Mumbai-Ahmedabad HSR Pier)
+      gujarat: "#2980B9",        // Blue (Ahmedabad-Dholera Exp)
+      rajasthan: "#27AE60",      // Green (Bhadla-Bikaner Solar Power)
+      jammuandkashmir: "#16A085",// Teal (Chenab River Bridge)
+    };
+
+    // Compute averages and assign distinct colors
     const result = {};
     map.forEach((val, key) => {
       const count = val.projects.length;
       const avgRisk = count > 0 ? Math.round(val.riskSum / count) : 0;
       let riskLevel = "stable";
-      let color = tokens.good;
 
       if (avgRisk >= 70) {
         riskLevel = "critical";
-        color = tokens.bad;
       } else if (avgRisk >= 45) {
         riskLevel = "watch";
-        color = tokens.warn;
       }
+
+      // Distinct state color or fallback to risk color
+      const distinctColor = stateColorPalette[key] || (avgRisk >= 70 ? tokens.bad : avgRisk >= 45 ? tokens.warn : tokens.good);
 
       result[key] = {
         name: val.rawName,
@@ -65,7 +87,7 @@ export function LandingMap({ projects = [] }) {
         totalRevised: val.totalCostRevised,
         avgRisk,
         riskLevel,
-        color,
+        color: distinctColor,
         projects: val.projects,
       };
     });
@@ -115,33 +137,111 @@ export function LandingMap({ projects = [] }) {
               National Central Sector Grid
             </div>
             <div style={{ fontSize: 11, color: tokens.slate, marginTop: 2 }}>
-              Hover or click states to inspect corridor telemetry
+              Hover or click colored states to inspect active corridor telemetry
             </div>
           </div>
 
           {/* Color Legend */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: tokens.slate }}>
-              <span style={{ width: 10, height: 10, borderRadius: "2px", background: tokens.bad, display: "inline-block" }} />
-              <span>Critical (≥70)</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#E05D44", display: "inline-block" }} />
+              <span>Madhya Pradesh</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: tokens.slate }}>
-              <span style={{ width: 10, height: 10, borderRadius: "2px", background: tokens.warn, display: "inline-block" }} />
-              <span>Watch (45-69)</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#F39C12", display: "inline-block" }} />
+              <span>Uttar Pradesh</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: tokens.slate }}>
-              <span style={{ width: 10, height: 10, borderRadius: "2px", background: tokens.good, display: "inline-block" }} />
-              <span>Stable (&lt;45)</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#C0392B", display: "inline-block" }} />
+              <span>Maharashtra</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: tokens.slate }}>
-              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#E2E0D8", display: "inline-block" }} />
-              <span>Unmonitored</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#2980B9", display: "inline-block" }} />
+              <span>Gujarat</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#27AE60", display: "inline-block" }} />
+              <span>Rajasthan</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#16A085", display: "inline-block" }} />
+              <span>J&amp;K</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: tokens.slate }}>
+              <span style={{ width: 10, height: 10, borderRadius: "2px", background: "#EAE8E1", border: "1px solid #D5D2C8", display: "inline-block" }} />
+              <span>Other States</span>
             </div>
           </div>
         </div>
 
         {/* SVG Map Container */}
-        <div style={{ width: "100%", height: 460, position: "relative" }}>
+        <div
+          ref={mapContainerRef}
+          onMouseMove={handleContainerMouseMove}
+          onMouseLeave={() => {
+            setHoveredState(null);
+            setTooltip(null);
+          }}
+          style={{ width: "100%", height: 480, position: "relative" }}
+        >
+          {/* Dynamic Floating Cursor State Tooltip */}
+          {tooltip && (
+            <div
+              style={{
+                position: "absolute",
+                left: tooltipPos.x,
+                top: tooltipPos.y,
+                transform: `translate(${tooltipPos.x > 380 ? "-105%" : "14px"}, ${tooltipPos.y < 60 ? "16px" : "-105%"})`,
+                pointerEvents: "none",
+                zIndex: 100,
+                background: "rgba(17, 24, 39, 0.96)",
+                backdropFilter: "blur(8px)",
+                color: "#FFFFFF",
+                borderRadius: "6px",
+                padding: "6px 12px",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                whiteSpace: "nowrap",
+                transition: "transform 0.04s ease",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: tooltip.data ? tooltip.data.color : "#94A3B8",
+                    boxShadow: tooltip.data ? `0 0 8px ${tooltip.data.color}` : "none",
+                    display: "inline-block",
+                  }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.01em" }}>
+                  {tooltip.name}
+                </span>
+              </div>
+
+              {tooltip.data ? (
+                <div style={{ fontSize: 10.5, color: "#CBD5E1", marginTop: 2, display: "flex", gap: 6, alignItems: "center" }}>
+                  <span>{tooltip.data.count} {tooltip.data.count === 1 ? "Corridor" : "Corridors"}</span>
+                  <span style={{ opacity: 0.5 }}>·</span>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: tooltip.data.avgRisk >= 70 ? "#FCA5A5" : tooltip.data.avgRisk >= 45 ? "#FDE047" : "#86EFAC",
+                    }}
+                  >
+                    Risk {tooltip.data.avgRisk}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>
+                  No Active Corridors
+                </div>
+              )}
+            </div>
+          )}
+
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{
@@ -161,43 +261,46 @@ export function LandingMap({ projects = [] }) {
                   const isHovered = hoveredState === stateName;
                   const isSelected = selectedState === stateName;
 
-                  let fillColor = "#E2E0D8";
+                  // Base fill & stroke
+                  let fillColor = "#EAE8E1";
+                  let strokeColor = "#D0CDC4";
+                  let strokeWidth = 0.8;
+
                   if (data) {
-                    fillColor = data.color;
+                    fillColor = isHovered || isSelected ? data.color : data.color;
+                    strokeColor = isHovered || isSelected ? tokens.ink : "#FFFFFF";
+                    strokeWidth = isHovered || isSelected ? 2 : 1.2;
+                  } else if (isHovered) {
+                    fillColor = "#DDD9D0";
+                    strokeColor = tokens.slate;
+                    strokeWidth = 1.2;
                   }
 
                   return (
                     <Geography
                       key={geo.rsmKey}
                       geography={geo}
-                      onMouseEnter={() => setHoveredState(stateName)}
-                      onMouseLeave={() => setHoveredState(null)}
+                      fill={fillColor}
+                      stroke={strokeColor}
+                      strokeWidth={strokeWidth}
+                      onMouseEnter={() => {
+                        setHoveredState(stateName);
+                        setTooltip({
+                          name: stateName,
+                          data: data || null,
+                        });
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredState(null);
+                        setTooltip(null);
+                      }}
                       onClick={() => {
                         if (data) setSelectedState(stateName);
                       }}
                       style={{
-                        default: {
-                          fill: isSelected || isHovered ? (data ? data.color : "#D3D0C7") : fillColor,
-                          stroke: isHovered || isSelected ? tokens.ink : "#FFFFFF",
-                          strokeWidth: isHovered || isSelected ? 1.5 : 0.6,
-                          outline: "none",
-                          transition: "all 0.2s ease",
-                          cursor: data ? "pointer" : "default",
-                          filter: isHovered ? "brightness(1.1)" : "none",
-                        },
-                        hover: {
-                          fill: data ? data.color : "#D3D0C7",
-                          stroke: tokens.ink,
-                          strokeWidth: 1.8,
-                          outline: "none",
-                          cursor: data ? "pointer" : "default",
-                        },
-                        pressed: {
-                          fill: data ? data.color : "#C5C2B8",
-                          stroke: tokens.ink,
-                          strokeWidth: 2,
-                          outline: "none",
-                        },
+                        default: { outline: "none", cursor: data ? "pointer" : "default", transition: "all 0.15s ease" },
+                        hover: { outline: "none", cursor: data ? "pointer" : "default", filter: data ? "brightness(1.15)" : "none" },
+                        pressed: { outline: "none" },
                       }}
                     />
                   );
@@ -354,8 +457,9 @@ export function LandingMap({ projects = [] }) {
                       <div style={{ ...monoStyle, fontSize: 13, fontWeight: 700, color: pColor }}>
                         {pRisk}
                       </div>
-                      <div style={{ fontSize: 9.5, color: tokens.slate }}>
-                        {p.actual_progress ?? p.actual ?? 0}% done
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3, fontSize: 9.5, color: tokens.steel, fontWeight: 600 }}>
+                        <Lock size={9} />
+                        <span>Restricted</span>
                       </div>
                     </div>
                   </div>

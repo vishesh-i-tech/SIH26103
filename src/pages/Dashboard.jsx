@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   LineChart,
@@ -16,16 +16,19 @@ import {
   ShieldAlert,
   Clock,
   Layers,
+  MapPin,
 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { riskTone, riskLabel, formatINR } from "../utils/risk";
 import { useProjects } from "../context/ProjectContext";
 import Panel from "../components/Panel";
 import RiskChip from "../components/RiskChip";
+import DashboardGeoMap from "../components/DashboardGeoMap";
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { projects, loading, error, refreshProjects } = useProjects();
+  const [portfolioView, setPortfolioView] = useState("map"); // "map" | "trajectory"
 
   const totalProjects = projects.length;
   const highRiskProjects = projects.filter((p) => p.risk >= 70);
@@ -144,63 +147,154 @@ export function Dashboard() {
 
       {/* Main Grid: Risk Trend & Priority Worklist */}
       <div className="responsive-grid-2" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
-        {/* Trend Graph */}
+        {/* Left Column: National Geo Grid Map OR Risk Trajectory Trend */}
         <Panel style={{ padding: 18, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          {/* Card Header with View Switcher */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: 12,
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
             <div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: tokens.ink }}>
-                Portfolio Risk Trajectory
+              <div style={{ fontSize: 13, fontWeight: 700, color: tokens.ink, display: "flex", alignItems: "center", gap: 6 }}>
+                {portfolioView === "map" ? (
+                  <>
+                    <MapPin size={15} color={tokens.bad} />
+                    <span>Risk Distribution Across India</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp size={15} color={tokens.steel} />
+                    <span>Portfolio Risk Trajectory</span>
+                  </>
+                )}
               </div>
-              <div style={{ fontSize: 11, color: tokens.slate, marginTop: 1 }}>
-                6-month weighted average risk progression
+              <div style={{ fontSize: 11, color: tokens.slate, marginTop: 2 }}>
+                {portfolioView === "map"
+                  ? "Interactive GIS spatial risk grid · Hover states to inspect active corridors"
+                  : "6-month weighted average risk progression across all projects"}
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: tokens.slate }}>
-              <span style={{ width: 10, height: 2, background: portfolioTrendColor, display: "inline-block" }} />
-              <span style={{ ...monoStyle, color: portfolioTrendColor, fontWeight: 600 }}>
-                Circle Mean ({lastAvg}) · {isRising ? "Rising Trajectory (+)" : isFalling ? "Improving Trajectory (-)" : "Stable"}
-              </span>
+
+            {/* Pill Toggle Switcher */}
+            <div
+              style={{
+                display: "inline-flex",
+                background: tokens.paper,
+                border: `1px solid ${tokens.line}`,
+                borderRadius: tokens.radiusSm,
+                padding: 2,
+                gap: 2,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPortfolioView("map")}
+                style={{
+                  padding: "5px 11px",
+                  fontSize: 11.5,
+                  fontWeight: portfolioView === "map" ? 700 : 500,
+                  background: portfolioView === "map" ? tokens.panel : "transparent",
+                  color: portfolioView === "map" ? tokens.ink : tokens.slate,
+                  border: "none",
+                  borderRadius: tokens.radiusSm,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  boxShadow: portfolioView === "map" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <MapPin size={12} color={portfolioView === "map" ? tokens.bad : tokens.slate} />
+                <span>National Map</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPortfolioView("trajectory")}
+                style={{
+                  padding: "5px 11px",
+                  fontSize: 11.5,
+                  fontWeight: portfolioView === "trajectory" ? 700 : 500,
+                  background: portfolioView === "trajectory" ? tokens.panel : "transparent",
+                  color: portfolioView === "trajectory" ? tokens.ink : tokens.slate,
+                  border: "none",
+                  borderRadius: tokens.radiusSm,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  boxShadow: portfolioView === "trajectory" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <TrendingUp size={12} color={portfolioView === "trajectory" ? tokens.steel : tokens.slate} />
+                <span>Risk Trajectory</span>
+              </button>
             </div>
           </div>
 
-          <div style={{ height: 200, width: "100%", marginTop: 8 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={avgTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid stroke={tokens.line} strokeDasharray="2 2" vertical={false} />
-                <XAxis
-                  dataKey="m"
-                  tick={{ fontSize: 11, fill: tokens.slate }}
-                  axisLine={{ stroke: tokens.line }}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 11, fill: tokens.slate }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  formatter={(val) => [`${val} / 100`, "Risk Score"]}
-                  contentStyle={{
-                    fontSize: 12,
-                    background: tokens.panel,
-                    border: `1px solid ${tokens.line}`,
-                    borderRadius: tokens.radiusSm,
-                    boxShadow: "none",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="v"
-                  stroke={portfolioTrendColor}
-                  strokeWidth={2.5}
-                  dot={{ r: 3.5, fill: portfolioTrendColor }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {/* View Content */}
+          {portfolioView === "map" ? (
+            <DashboardGeoMap projects={projects} />
+          ) : (
+            <>
+              {/* Trajectory Header Info */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, fontSize: 11.5, color: tokens.slate, marginBottom: 8 }}>
+                <span style={{ width: 10, height: 2, background: portfolioTrendColor, display: "inline-block" }} />
+                <span style={{ ...monoStyle, color: portfolioTrendColor, fontWeight: 600 }}>
+                  Circle Mean ({lastAvg}) · {isRising ? "Rising Trajectory (+)" : isFalling ? "Improving Trajectory (-)" : "Stable"}
+                </span>
+              </div>
 
+              {/* LineChart */}
+              <div style={{ height: 260, width: "100%", marginTop: 4 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={avgTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid stroke={tokens.line} strokeDasharray="2 2" vertical={false} />
+                    <XAxis
+                      dataKey="m"
+                      tick={{ fontSize: 11, fill: tokens.slate }}
+                      axisLine={{ stroke: tokens.line }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tick={{ fontSize: 11, fill: tokens.slate }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      formatter={(val) => [`${val} / 100`, "Risk Score"]}
+                      contentStyle={{
+                        fontSize: 12,
+                        background: tokens.panel,
+                        border: `1px solid ${tokens.line}`,
+                        borderRadius: tokens.radiusSm,
+                        boxShadow: "none",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="v"
+                      stroke={portfolioTrendColor}
+                      strokeWidth={2.5}
+                      dot={{ r: 3.5, fill: portfolioTrendColor }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+
+          {/* Bottom Summary Bar */}
           <div
             style={{
               marginTop: 14,
@@ -260,6 +354,7 @@ export function Dashboard() {
               <div
                 key={p.id}
                 onClick={() => navigate(`/projects/${p.id}`)}
+                className="box-hover-lift"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -269,7 +364,6 @@ export function Dashboard() {
                   border: `1px solid ${tokens.line}`,
                   background: tokens.panel,
                   cursor: "pointer",
-                  transition: "background 0.1s ease",
                 }}
               >
                 <div style={{ ...monoStyle, fontSize: 12, fontWeight: 700, color: tokens.slate, width: 16 }}>

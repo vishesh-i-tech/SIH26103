@@ -108,3 +108,83 @@ a {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ==========================================================================
+   PAIMANA AI - Continuous Flowing Rainbow Brand Typography
+   ========================================================================== */
+@keyframes rainbowFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.paimana-rainbow-brand {
+  font-family: 'Outfit', 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  background: linear-gradient(
+    90deg,
+    #E11D48 0%,
+    #EA580C 16%,
+    #D97706 32%,
+    #059669 48%,
+    #0284C7 64%,
+    #7C3AED 80%,
+    #E11D48 100%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rainbowFlow 4s linear infinite;
+  display: inline-block;
+  will-change: background-position;
+}
+
+/* ==========================================================================
+   Universal Card / Box Lift On Hover Animation ("Uthna Chahiye Uper")
+   ========================================================================== */
+.panel-box-lift,
+.card-box-lift,
+.box-hover-lift,
+.interactive-card {
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+  will-change: transform, box-shadow;
+}
+
+.panel-box-lift:hover,
+.card-box-lift:hover,
+.box-hover-lift:hover,
+.interactive-card:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.05) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+}
+
+/* Cursor Highlight Glow for Inputs, Buttons, and Role Cards */
+.cursor-highlight-glow {
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cursor-highlight-glow:hover {
+  border-color: rgba(245, 158, 11, 0.75) !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25), inset 0 0 10px rgba(245, 158, 11, 0.08) !important;
+  transform: translateY(-4px);
+}
+
+.cursor-text-highlight {
+  transition: all 0.2s ease;
+}
+
+.cursor-text-highlight:hover {
+  color: #D97706 !important;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+

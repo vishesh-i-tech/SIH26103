@@ -27,6 +27,8 @@ import { useProjects } from "../context/ProjectContext";
 import FadeUp from "../components/FadeUp";
 import LandingMap from "../components/LandingMap";
 import RiskChip from "../components/RiskChip";
+import HeroSlideshow from "../components/HeroSlideshow";
+import PaimanaBrand from "../components/PaimanaBrand";
 
 export function Landing() {
   const navigate = useNavigate();
@@ -69,6 +71,22 @@ export function Landing() {
     }
   };
 
+  const getDepartmentLogo = (sector) => {
+    switch (sector?.toLowerCase()) {
+      case "roads":
+        return "/images/departments/roads.png";
+      case "railways":
+        return "/images/departments/railways.png";
+      case "power":
+      case "energy":
+        return "/images/departments/power.png";
+      case "bridges":
+        return "/images/departments/bridges.png";
+      default:
+        return "/images/departments/roads.png";
+    }
+  };
+
   return (
     <div
       style={{
@@ -103,7 +121,7 @@ export function Landing() {
       />
 
       {/* ------------------------------------------------------------- */}
-      {/* TOP HEADER / LOGO BAR (Visible at top) */}
+      {/* TOP HEADER / LOGO BAR (Visible at top of Slideshow) */}
       {/* ------------------------------------------------------------- */}
       <header
         style={{
@@ -116,86 +134,62 @@ export function Landing() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 clamp(18px, 5vw, 60px)",
-          zIndex: 20,
+          zIndex: 30,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: tokens.radiusSm,
-              background: tokens.ink,
-              border: `1px solid ${tokens.line}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Shield size={20} color={tokens.steel} />
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.06em", color: tokens.ink }}>
-              PAIMANA AI
-            </div>
-            <div style={{ fontSize: 10, color: tokens.slate, fontWeight: 600, letterSpacing: "0.02em" }}>
-              MoSPI · IPMD PORTAL
-            </div>
-          </div>
+        {/* Brand & MoSPI Seal */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <PaimanaBrand size="md" showBadge={true} to="/" />
+          <span style={{ color: "rgba(255, 255, 255, 0.3)", fontSize: "14px" }}>|</span>
+          <span style={{ fontSize: "12px", color: "#CBD5E1", fontWeight: 600, letterSpacing: "0.02em" }}>
+            MoSPI · IPMD National Portal
+          </span>
         </div>
 
         {/* Top Header Login Action Buttons */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             onClick={() => navigate("/login?role=admin")}
+            className="cursor-highlight-glow"
             style={{
-              padding: "8px 16px",
-              background: tokens.steel,
-              color: "#FFFFFF",
+              padding: "8px 18px",
+              background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+              color: "#0F172A",
               border: "none",
-              borderRadius: tokens.radiusSm,
+              borderRadius: "8px",
               fontSize: 12,
-              fontWeight: 700,
+              fontWeight: 800,
               letterSpacing: "0.02em",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               gap: 6,
-              transition: "background 0.15s ease",
+              boxShadow: "0 2px 12px rgba(245, 158, 11, 0.35)",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = tokens.steelDeep)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = tokens.steel)}
           >
-            <Shield size={14} />
+            <Shield size={14} color="#0F172A" />
             <span>MoSPI Admin Login</span>
           </button>
 
           <button
             onClick={() => navigate("/login?role=field_officer")}
+            className="cursor-highlight-glow"
             style={{
-              padding: "7px 15px",
-              background: "transparent",
-              color: tokens.ink,
-              border: `1px solid ${tokens.line}`,
-              borderRadius: tokens.radiusSm,
+              padding: "7px 16px",
+              background: "rgba(15, 23, 42, 0.65)",
+              backdropFilter: "blur(8px)",
+              color: "#FFFFFF",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              borderRadius: "8px",
               fontSize: 12,
               fontWeight: 700,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               gap: 6,
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(47, 93, 115, 0.08)";
-              e.currentTarget.style.borderColor = tokens.steel;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.borderColor = tokens.line;
             }}
           >
-            <HardHat size={14} color={tokens.warn} />
+            <HardHat size={14} color="#F59E0B" />
             <span>Field Officer Login</span>
           </button>
         </div>
@@ -293,200 +287,111 @@ export function Landing() {
       </motion.nav>
 
       {/* ------------------------------------------------------------- */}
-      {/* SECTION 1: HERO (Full Viewport Height) */}
+      {/* SECTION 1: HERO SLIDESHOW WITH TRANSPARENT FROSTED GLASS CARD */}
+      {/* ------------------------------------------------------------- */}
+      <HeroSlideshow />
+
+      {/* ------------------------------------------------------------- */}
+      {/* EXECUTIVE MISSION STATS STRIP (Transition between Hero and Map) */}
       {/* ------------------------------------------------------------- */}
       <section
         style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          padding: "100px clamp(20px, 6vw, 100px) 60px",
+          background: "#FFFFFF",
+          borderBottom: `1px solid ${tokens.line}`,
+          padding: "32px clamp(20px, 6vw, 100px)",
           position: "relative",
           zIndex: 10,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
         }}
       >
-        {/* Government Badge */}
-        <FadeUp delay={0.1}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "5px 14px",
-              background: "rgba(47, 93, 115, 0.08)",
-              border: `1px solid ${tokens.steel}44`,
-              borderRadius: tokens.radiusSm,
-              fontSize: 11,
-              fontWeight: 700,
-              color: tokens.steel,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              marginBottom: 24,
-            }}
-          >
-            <Shield size={13} />
-            <span>MoSPI Central Sector Infrastructure Monitoring · SIH26103</span>
-          </div>
-        </FadeUp>
-
-        {/* Word-by-Word Staggered Headline */}
-        <h1
+        <div
           style={{
-            maxWidth: 1000,
-            fontSize: "clamp(30px, 5.2vw, 62px)",
-            fontWeight: 900,
-            lineHeight: 1.1,
-            letterSpacing: "-0.03em",
-            color: tokens.ink,
-            margin: "0 auto 20px",
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: "0.26em",
+            maxWidth: 1200,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 24,
+            alignItems: "center",
           }}
         >
-          {headlineWords.map((word, index) => (
-            <motion.span
-              key={index}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.75,
-                delay: index * 0.08,
-                ease: [0.22, 1, 0.36, 1],
-              }}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
               style={{
-                color:
-                  word === "EARLY" || word === "WARNINGS."
-                    ? tokens.steel
-                    : tokens.ink,
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: "rgba(0, 163, 255, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid rgba(0, 163, 255, 0.25)",
+                flexShrink: 0,
               }}
             >
-              {word}
-            </motion.span>
-          ))}
-        </h1>
+              <Shield size={22} color="#00A3FF" />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: tokens.slate, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Official Mandate
+              </div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: tokens.ink, marginTop: 1 }}>
+                ₹150+ Crore Central Projects
+              </div>
+            </div>
+          </div>
 
-        {/* Subtext */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            maxWidth: 680,
-            fontSize: "clamp(14px, 1.8vw, 17.5px)",
-            lineHeight: 1.55,
-            color: tokens.slate,
-            margin: "0 auto 36px",
-          }}
-        >
-          AI-powered risk prediction, billing anomaly detection, and officer prioritization
-          for MoSPI's Central Sector Infrastructure Projects (₹150 Cr+).
-        </motion.p>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: "rgba(47, 93, 115, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid rgba(47, 93, 115, 0.25)",
+                flexShrink: 0,
+              }}
+            >
+              <Layers size={22} color={tokens.steel} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: tokens.slate, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Portfolio Coverage
+              </div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: tokens.ink, marginTop: 1 }}>
+                1,824 Infrastructure Assets
+              </div>
+            </div>
+          </div>
 
-        {/* Hero CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: 1.05, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            display: "flex",
-            gap: 14,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          <button
-            onClick={() => navigate("/login?role=admin")}
-            style={{
-              padding: "13px 26px",
-              background: tokens.steel,
-              color: "#FFFFFF",
-              border: "none",
-              borderRadius: tokens.radiusSm,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 4px 14px rgba(47, 93, 115, 0.25)",
-              transition: "transform 0.15s ease, background 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = tokens.steelDeep;
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = tokens.steel;
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <Shield size={16} />
-            <span>MoSPI Admin Login</span>
-            <ArrowRight size={15} />
-          </button>
-
-          <button
-            onClick={() => navigate("/login?role=field_officer")}
-            style={{
-              padding: "12px 24px",
-              background: tokens.panel,
-              color: tokens.ink,
-              border: `1.5px solid ${tokens.line}`,
-              borderRadius: tokens.radiusSm,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = tokens.steel;
-              e.currentTarget.style.background = "rgba(47, 93, 115, 0.04)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = tokens.line;
-              e.currentTarget.style.background = tokens.panel;
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <HardHat size={16} color={tokens.warn} />
-            <span>Field Officer Login</span>
-          </button>
-        </motion.div>
-
-        {/* Animated Bounce Scroll Down Indicator */}
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          onClick={() => {
-            const el = document.getElementById("map-section");
-            if (el) el.scrollIntoView({ behavior: "smooth" });
-          }}
-          style={{
-            position: "absolute",
-            bottom: 24,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 4,
-            cursor: "pointer",
-            color: tokens.slate,
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.04em",
-          }}
-        >
-          <span>EXPLORE COVERAGE</span>
-          <ChevronDown size={16} color={tokens.steel} />
-        </motion.div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: "rgba(39, 174, 96, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid rgba(39, 174, 96, 0.25)",
+                flexShrink: 0,
+              }}
+            >
+              <TrendingUp size={22} color="#27AE60" />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: tokens.slate, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Predictive Analytics Lift
+              </div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: tokens.ink, marginTop: 1 }}>
+                92.4% R² Milestone Accuracy
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ------------------------------------------------------------- */}
@@ -645,15 +550,52 @@ export function Landing() {
                     }}
                   >
                     <div>
-                      {/* Top Row: Sector Icon, Code & Risk */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ padding: "4px 6px", background: tokens.paper, borderRadius: "2px" }}>
-                            {getSectorIcon(project.sector)}
-                          </span>
-                          <span style={{ ...monoStyle, fontSize: 12, fontWeight: 700, color: tokens.steel }}>
-                            {project.code || project.id}
-                          </span>
+                      {/* Top Row: Prominent Department Logo, Project Code & Risk */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 12,
+                          paddingBottom: 10,
+                          borderBottom: `1px solid ${tokens.line}`,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div
+                            style={{
+                              background: "#FFFFFF",
+                              border: `1px solid ${tokens.line}`,
+                              borderRadius: "6px",
+                              padding: "4px 10px",
+                              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              height: 54,
+                              minWidth: 56,
+                            }}
+                          >
+                            <img
+                              src={getDepartmentLogo(project.sector)}
+                              alt={project.sector}
+                              style={{
+                                height: 46,
+                                width: "auto",
+                                maxWidth: 115,
+                                objectFit: "contain",
+                                display: "block",
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div style={{ ...monoStyle, fontSize: 13, fontWeight: 800, color: tokens.steel }}>
+                              {project.code || project.id}
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: tokens.slate, textTransform: "uppercase", marginTop: 1 }}>
+                              {project.location}
+                            </div>
+                          </div>
                         </div>
                         <RiskChip score={pRisk} />
                       </div>
@@ -706,44 +648,58 @@ export function Landing() {
                         </div>
                       </div>
 
-                      {/* Physical Progress Bar */}
-                      <div style={{ marginBottom: 8 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                          <span style={{ color: tokens.slate }}>Physical Progress</span>
-                          <span style={{ ...monoStyle, fontWeight: 700, color: tokens.ink }}>
-                            {pActual}% <span style={{ fontWeight: 400, color: tokens.slate }}>/ {pPlanned}% target</span>
+                      {/* Physical Progress Confidential Box (Hidden for Public) */}
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          background: "#F8F7F4",
+                          border: "1px dashed #D6D3CA",
+                          borderRadius: tokens.radiusSm,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <Lock size={12} color={tokens.steel} />
+                          <span style={{ fontSize: 11, color: tokens.ink, fontWeight: 600 }}>
+                            Physical Progress Telemetry
                           </span>
                         </div>
-                        <div style={{ width: "100%", height: 6, background: "#E2E0D8", borderRadius: 3, overflow: "hidden" }}>
-                          <div
-                            style={{
-                              width: `${Math.min(100, pActual)}%`,
-                              height: "100%",
-                              background: pActual < pPlanned - 10 ? tokens.bad : tokens.steel,
-                              borderRadius: 3,
-                            }}
-                          />
-                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: tokens.steel,
+                            background: "rgba(47, 93, 115, 0.09)",
+                            padding: "2px 7px",
+                            borderRadius: "3px",
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          🔒 Login to View
+                        </span>
                       </div>
                     </div>
 
                     {/* Bottom CTA Tag */}
                     <div
                       style={{
-                        marginTop: 14,
+                        marginTop: 12,
                         paddingTop: 10,
                         borderTop: `1px solid ${tokens.line}`,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        fontSize: 11,
+                        fontSize: 11.5,
                         fontWeight: 600,
                         color: tokens.steel,
                       }}
                     >
-                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                         <Lock size={12} />
-                        <span>Login for full audit file</span>
+                        <span>Officer Login for Full Telemetry</span>
                       </span>
                       <ArrowRight size={13} />
                     </div>

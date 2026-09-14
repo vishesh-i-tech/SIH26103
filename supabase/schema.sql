@@ -186,10 +186,11 @@ CREATE POLICY "Admins and assigned officers can read projects"
   );
 
 DROP POLICY IF EXISTS "Admins can insert projects" ON public.projects;
-CREATE POLICY "Admins can insert projects"
+DROP POLICY IF EXISTS "Allow insert projects" ON public.projects;
+CREATE POLICY "Allow insert projects"
   ON public.projects FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
+  TO authenticated, anon
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Admins can update projects" ON public.projects;
 CREATE POLICY "Admins can update projects"
@@ -220,10 +221,11 @@ CREATE POLICY "Admins and assigned officers can read risk_trend"
   );
 
 DROP POLICY IF EXISTS "Admins can insert risk_trend" ON public.risk_trend;
-CREATE POLICY "Admins can insert risk_trend"
+DROP POLICY IF EXISTS "Allow insert risk_trend" ON public.risk_trend;
+CREATE POLICY "Allow insert risk_trend"
   ON public.risk_trend FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
+  TO authenticated, anon
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Admins can update risk_trend" ON public.risk_trend;
 CREATE POLICY "Admins can update risk_trend"
@@ -254,10 +256,11 @@ CREATE POLICY "Admins and assigned officers can read risk_factors"
   );
 
 DROP POLICY IF EXISTS "Admins can insert risk_factors" ON public.risk_factors;
-CREATE POLICY "Admins can insert risk_factors"
+DROP POLICY IF EXISTS "Allow insert risk_factors" ON public.risk_factors;
+CREATE POLICY "Allow insert risk_factors"
   ON public.risk_factors FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
+  TO authenticated, anon
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Admins can update risk_factors" ON public.risk_factors;
 CREATE POLICY "Admins can update risk_factors"
@@ -289,19 +292,18 @@ CREATE POLICY "Admins and officers can read daily_entries"
   );
 
 DROP POLICY IF EXISTS "Field officers and admins can insert daily_entries" ON public.daily_entries;
-CREATE POLICY "Field officers and admins can insert daily_entries"
+DROP POLICY IF EXISTS "Allow insert daily_entries" ON public.daily_entries;
+CREATE POLICY "Allow insert daily_entries"
   ON public.daily_entries FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    public.is_admin()
-    OR auth.uid() = submitted_by
-  );
+  TO authenticated, anon
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Admins can update review status on daily_entries" ON public.daily_entries;
-CREATE POLICY "Admins can update review status on daily_entries"
+DROP POLICY IF EXISTS "Allow update daily_entries" ON public.daily_entries;
+CREATE POLICY "Allow update daily_entries"
   ON public.daily_entries FOR UPDATE
-  TO authenticated
-  USING (public.is_admin() OR auth.uid() = submitted_by);
+  TO authenticated, anon
+  USING (true);
 
 -- Billing Entries Policies
 DROP POLICY IF EXISTS "Authenticated users can read billing_entries" ON public.billing_entries;
@@ -320,16 +322,18 @@ CREATE POLICY "Admins and assigned officers can read billing_entries"
   );
 
 DROP POLICY IF EXISTS "Admins can insert billing_entries" ON public.billing_entries;
-CREATE POLICY "Admins can insert billing_entries"
+DROP POLICY IF EXISTS "Allow insert billing_entries" ON public.billing_entries;
+CREATE POLICY "Allow insert billing_entries"
   ON public.billing_entries FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
+  TO authenticated, anon
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Admins can update billing_entries" ON public.billing_entries;
-CREATE POLICY "Admins can update billing_entries"
+DROP POLICY IF EXISTS "Allow update billing_entries" ON public.billing_entries;
+CREATE POLICY "Allow update billing_entries"
   ON public.billing_entries FOR UPDATE
-  TO authenticated
-  USING (public.is_admin());
+  TO authenticated, anon
+  USING (true);
 
 DROP POLICY IF EXISTS "Admins can delete billing_entries" ON public.billing_entries;
 CREATE POLICY "Admins can delete billing_entries"

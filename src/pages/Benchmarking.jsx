@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from "recharts";
 import { GitCompare, Layers, TrendingDown, TrendingUp, AlertCircle, RefreshCw } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
@@ -18,6 +19,20 @@ import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { normalizeProject } from "../utils/supabaseHelpers";
 import Panel from "../components/Panel";
 import RiskChip from "../components/RiskChip";
+
+// Distinct executive color for each sector's pillar
+const SECTOR_BAR_COLORS = {
+  Roads: "#2563EB",     // Sapphire Blue
+  Bridges: "#0D9488",   // Emerald Teal
+  Railways: "#7C3AED",  // Royal Violet / Purple
+  Power: "#EA580C",     // Warm Orange / Amber
+};
+
+const getSectorColor = (sector, index) => {
+  if (SECTOR_BAR_COLORS[sector]) return SECTOR_BAR_COLORS[sector];
+  const palette = ["#2563EB", "#0D9488", "#7C3AED", "#EA580C", "#DC2626", "#0284C7"];
+  return palette[index % palette.length];
+};
 
 export function Benchmarking() {
   const navigate = useNavigate();
@@ -138,28 +153,83 @@ export function Benchmarking() {
           Average Composite Risk Index by Sector
         </div>
         {loading ? (
-          <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: tokens.slate, fontSize: 12 }}>
+          <div style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: tokens.slate, fontSize: 12 }}>
             Aggregating sector statistics from Supabase...
           </div>
         ) : (
-          <div style={{ height: 180, width: "100%" }}>
+          <div style={{ height: 220, width: "100%" }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sectorData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+              <BarChart data={sectorData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
                 <CartesianGrid stroke={tokens.line} strokeDasharray="2 2" vertical={false} />
-                <XAxis dataKey="sector" tick={{ fontSize: 12, fill: tokens.ink }} axisLine={{ stroke: tokens.line }} tickLine={false} />
+                <XAxis dataKey="sector" tick={{ fontSize: 12, fontWeight: 700, fill: tokens.slate }} axisLine={{ stroke: tokens.line }} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: tokens.slate }} axisLine={false} tickLine={false} />
                 <Tooltip
-                  formatter={(val) => [`${val} / 100`, "Sector Risk"]}
+                  formatter={(val, name, item) => [`${val} / 100`, `${item.payload.sector} Risk Index`]}
                   contentStyle={{
                     fontSize: 12,
                     background: tokens.panel,
                     border: `1px solid ${tokens.line}`,
                     borderRadius: tokens.radiusSm,
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
                   }}
                 />
-                <Bar dataKey="avgRisk" radius={[3, 3, 0, 0]} barSize={44}>
+                <Bar
+                  dataKey="avgRisk"
+                  radius={[6, 6, 0, 0]}
+                  barSize={74}
+                >
+                  <LabelList
+                    content={({ x, y, width, height, index }) => {
+                      const entry = sectorData[index];
+                      if (!entry) return null;
+                      const centerX = x + width / 2;
+                      const centerY = y + height / 2;
+                      return (
+                        <g>
+                          {/* Score on Top of Pillar */}
+                          <text
+                            x={centerX}
+                            y={y - 8}
+                            fill="#0F172A"
+                            textAnchor="middle"
+                            fontSize="12.5"
+                            fontWeight="800"
+                            fontFamily="ui-monospace, monospace"
+                          >
+                            {entry.avgRisk}
+                          </text>
+
+                          {/* Sector Name INSIDE the Pillar */}
+                          <text
+                            x={centerX}
+                            y={centerY}
+                            fill="#FFFFFF"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fontSize="13"
+                            fontWeight="800"
+                            letterSpacing="0.04em"
+                            style={{
+                              textShadow: "0 1px 4px rgba(0, 0, 0, 0.7)",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            {entry.sector}
+                          </text>
+                        </g>
+                      );
+                    }}
+                  />
                   {sectorData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={riskTone(entry.avgRisk)} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={getSectorColor(entry.sector, index)}
+                      style={{
+                        cursor: "pointer",
+                        filter: "drop-shadow(0 3px 6px rgba(0, 0, 0, 0.12))",
+                        transition: "opacity 0.2s ease",
+                      }}
+                    />
                   ))}
                 </Bar>
               </BarChart>

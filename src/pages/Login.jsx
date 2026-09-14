@@ -1,29 +1,46 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Shield, HardHat, ArrowRight, Lock, Mail, AlertCircle, CheckCircle2 } from "lucide-react";
-import { tokens, monoStyle } from "../styles/tokens";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, HardHat, ArrowRight, Lock, Mail, AlertCircle, Sparkles, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import Panel from "../components/Panel";
+import PaimanaBrand from "../components/PaimanaBrand";
 
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedRole = searchParams.get("role"); // "admin" or "field_officer"
-  const { signIn, isConfigured, switchRole } = useAuth();
+  const { signIn, switchRole } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  const [successTargetRole, setSuccessTargetRole] = useState("admin");
 
-  // Pre-select role and prefill demo credentials if specified in URL query
   useEffect(() => {
     if (requestedRole === "admin") {
-      fillDemo("admin");
+      setSuccessTargetRole("admin");
     } else if (requestedRole === "field_officer" || requestedRole === "field") {
-      fillDemo("field");
+      setSuccessTargetRole("field_officer");
     }
   }, [requestedRole]);
+
+  const triggerPortalTransition = (targetPath, roleName) => {
+    setSuccessTargetRole(roleName);
+    setLoginSuccess(true);
+    setTimeout(() => {
+      navigate(targetPath);
+    }, 800);
+  };
+
+  const handleQuickRoleSelect = (roleName) => {
+    switchRole(roleName);
+    triggerPortalTransition(
+      roleName === "field_officer" ? "/field-dashboard" : "/dashboard",
+      roleName
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,217 +64,332 @@ export function Login() {
 
       if (error) {
         if (error.message.includes("Invalid login credentials")) {
-          setErrorMsg("Invalid email or password. Please verify your credentials.");
+          setErrorMsg("Invalid credentials. Please verify your official email & passcode.");
         } else {
-          setErrorMsg(error.message || "Authentication failed. Please check your credentials.");
+          setErrorMsg(error.message || "Authentication failed. Please verify credentials.");
         }
+        setIsSubmitting(false);
       } else {
-        // Redirect based on role
-        const userRole = data?.user?.user_metadata?.role || "admin";
-        if (userRole === "field_officer" || userRole === "field") {
-          navigate("/field-dashboard");
-        } else {
-          navigate("/dashboard");
-        }
+        const userRole = data?.user?.user_metadata?.role || requestedRole || "admin";
+        const target = (userRole === "field_officer" || userRole === "field")
+          ? "/field-dashboard"
+          : "/dashboard";
+        triggerPortalTransition(target, userRole);
       }
     } catch (err) {
-      setErrorMsg(err.message || "An unexpected network or authentication error occurred.");
-    } finally {
+      setErrorMsg(err.message || "An unexpected error occurred during secure authentication.");
       setIsSubmitting(false);
-    }
-  };
-
-  // Quick helper to fill demo credentials if needed
-  const fillDemo = (roleKey) => {
-    if (roleKey === "admin") {
-      setEmail("vishu@mospi.gov.in");
-      setPassword("MoSPI@Admin2026");
-    } else {
-      setEmail("field.officer@mospi.gov.in");
-      setPassword("Field@Engineer2026");
     }
   };
 
   return (
     <div
       style={{
+        position: "relative",
         minHeight: "100vh",
-        background: tokens.paper,
+        width: "100%",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        padding: "24px",
+        padding: "32px 20px",
+        overflow: "hidden",
+        background: "#F1F5F9",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 460 }}>
-        {/* Government Emblem / Header */}
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div
+      {/* ------------------------------------------------------------------ */}
+      {/* BACKGROUND COMMAND CENTER IMAGE (Light Ambient High-Key Atmosphere)*/}
+      {/* ------------------------------------------------------------------ */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: `url('/images/login_bg.png')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          filter: "brightness(1.06) contrast(1.02)",
+          transform: loginSuccess ? "scale(1.06)" : "scale(1.0)",
+          transition: "transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.8s ease",
+          zIndex: 1,
+        }}
+      />
+
+      {/* Light Frosted Tint Overlay (Softly shows screens in daylight clarity) */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `
+            radial-gradient(circle at center, rgba(248, 250, 252, 0.86) 0%, rgba(241, 245, 249, 0.82) 50%, rgba(226, 232, 240, 0.90) 100%),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.6) 0%, rgba(248, 250, 252, 0.75) 100%)
+          `,
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          zIndex: 2,
+        }}
+      />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* SUCCESS PORTAL ENTRANCE ANIMATION                                  */}
+      {/* ------------------------------------------------------------------ */}
+      <AnimatePresence>
+        {loginSuccess && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
             style={{
-              width: 48,
-              height: 48,
-              background: tokens.ink,
-              borderRadius: tokens.radiusMd,
-              display: "inline-flex",
+              position: "fixed",
+              inset: 0,
+              zIndex: 100,
+              display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: 12,
-              border: `1px solid ${tokens.line}`,
+              background: "radial-gradient(circle at center, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 249, 0.98) 100%)",
+              backdropFilter: "blur(20px)",
+              color: "#0F172A",
+              textAlign: "center",
             }}
           >
-            <Shield size={24} color={tokens.steel} />
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: tokens.ink, letterSpacing: "0.02em" }}>
-            PAIMANA AI
-          </div>
-          <div style={{ fontSize: 12.5, color: tokens.slate, marginTop: 4 }}>
-            Ministry of Statistics and Programme Implementation (MoSPI)
-          </div>
-          <div style={{ fontSize: 11, color: tokens.slate, marginTop: 2 }}>
-            Infrastructure & Project Monitoring Division (IPMD) · Live Portal Access
+            <motion.div
+              initial={{ scale: 0, rotate: -30 }}
+              animate={{ scale: [0, 1.2, 1], rotate: 0 }}
+              transition={{ duration: 0.5, ease: "backOut" }}
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 10px 30px rgba(245, 158, 11, 0.5)",
+                marginBottom: 20,
+              }}
+            >
+              <CheckCircle2 size={44} color="#0F172A" />
+            </motion.div>
+
+            <motion.h2
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{
+                fontSize: "26px",
+                fontWeight: 800,
+                letterSpacing: "0.02em",
+                color: "#0F172A",
+                marginBottom: "8px",
+              }}
+            >
+              Officer Identity Authorized
+            </motion.h2>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35 }}
+              style={{
+                fontSize: "13.5px",
+                color: "#B45309",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                fontFamily: "ui-monospace, monospace",
+              }}
+            >
+              Connecting to {successTargetRole === "field_officer" ? "Field Telemetry Grid" : "MoSPI Executive IPMD Dashboard"}...
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MAIN LOGIN CARD CONTAINER                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          position: "relative",
+          zIndex: 10,
+          width: "100%",
+          maxWidth: 480,
+        }}
+      >
+        {/* Brand Header: Large Clean Text, Clickable to Home / (No Dark Glassy Bubble) */}
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <PaimanaBrand
+            size="xl"
+            showBadge={true}
+            to="/"
+            subtitle="Ministry of Statistics and Programme Implementation"
+          />
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#64748B",
+              marginTop: "6px",
+              fontWeight: 500,
+            }}
+          >
+            Infrastructure & Project Monitoring Division (IPMD) · Portal Sign In
           </div>
         </div>
 
-        {/* Login Box */}
-        <Panel style={{ padding: "28px 24px" }}>
+        {/* Crisp Light Executive Auth Card */}
+        <div
+          className="panel-box-lift"
+          style={{
+            background: "rgba(255, 255, 255, 0.96)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            borderRadius: "20px",
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 2px 10px rgba(0, 0, 0, 0.04)",
+            padding: "32px 28px",
+          }}
+        >
           {/* Quick 1-Click Role Direct Access */}
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 22 }}>
             <div
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: tokens.slate,
+                color: "#64748B",
                 textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 10,
+                letterSpacing: "0.08em",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              Instant 1-Click Role Switch
+              <Sparkles size={13} color="#D97706" />
+              <span>Instant 1-Click Role Access</span>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {/* MoSPI Admin Button (Lifts up on hover) */}
               <button
                 type="button"
-                onClick={() => {
-                  switchRole("admin");
-                  navigate("/dashboard");
-                }}
+                onClick={() => handleQuickRoleSelect("admin")}
+                className="card-box-lift"
                 style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "flex-start",
-                  gap: 4,
-                  padding: "12px 14px",
-                  background: requestedRole === "admin" ? "rgba(47, 93, 115, 0.14)" : "rgba(56, 189, 248, 0.08)",
-                  border: requestedRole === "admin" ? `2px solid ${tokens.steel}` : `1.5px solid ${tokens.steel}`,
-                  boxShadow: requestedRole === "admin" ? `0 0 0 3px rgba(47, 93, 115, 0.2)` : "none",
-                  borderRadius: tokens.radiusSm,
+                  gap: 6,
+                  padding: "14px",
+                  background: requestedRole === "admin" ? "rgba(245, 158, 11, 0.12)" : "#F8FAFC",
+                  border: requestedRole === "admin" ? "1.5px solid #F59E0B" : "1px solid #E2E8F0",
+                  borderRadius: "12px",
                   cursor: "pointer",
                   textAlign: "left",
-                  transition: "all 0.15s ease",
-                  position: "relative",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.16)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = requestedRole === "admin" ? "rgba(47, 93, 115, 0.14)" : "rgba(56, 189, 248, 0.08)")}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Shield size={16} color={tokens.steel} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: tokens.ink }}>MoSPI Admin</span>
+                    <Shield size={16} color="#D97706" />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>MoSPI Admin</span>
                   </div>
-                  <ArrowRight size={13} color={tokens.steel} />
+                  <ArrowRight size={13} color="#D97706" />
                 </div>
-                <div style={{ fontSize: 11, color: tokens.slate, lineHeight: 1.2 }}>
-                  {requestedRole === "admin" ? "★ Pre-selected from Landing" : "Executive Portfolio View"}
+                <div style={{ fontSize: 11, color: "#64748B", lineHeight: 1.3 }}>
+                  Executive Portfolio View
                 </div>
               </button>
 
+              {/* Field Officer Button (Lifts up on hover) */}
               <button
                 type="button"
-                onClick={() => {
-                  switchRole("field_officer");
-                  navigate("/field-dashboard");
-                }}
+                onClick={() => handleQuickRoleSelect("field_officer")}
+                className="card-box-lift"
                 style={{
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "flex-start",
-                  gap: 4,
-                  padding: "12px 14px",
-                  background: (requestedRole === "field_officer" || requestedRole === "field") ? "rgba(245, 158, 11, 0.16)" : "rgba(245, 158, 11, 0.08)",
-                  border: (requestedRole === "field_officer" || requestedRole === "field") ? `2px solid ${tokens.warn}` : `1.5px solid ${tokens.warn}`,
-                  boxShadow: (requestedRole === "field_officer" || requestedRole === "field") ? `0 0 0 3px rgba(245, 158, 11, 0.2)` : "none",
-                  borderRadius: tokens.radiusSm,
+                  gap: 6,
+                  padding: "14px",
+                  background: (requestedRole === "field_officer" || requestedRole === "field") ? "rgba(245, 158, 11, 0.12)" : "#F8FAFC",
+                  border: (requestedRole === "field_officer" || requestedRole === "field") ? "1.5px solid #F59E0B" : "1px solid #E2E8F0",
+                  borderRadius: "12px",
                   cursor: "pointer",
                   textAlign: "left",
-                  transition: "all 0.15s ease",
-                  position: "relative",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(245, 158, 11, 0.2)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = (requestedRole === "field_officer" || requestedRole === "field") ? "rgba(245, 158, 11, 0.16)" : "rgba(245, 158, 11, 0.08)")}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <HardHat size={16} color={tokens.warn} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: tokens.ink }}>Field Officer</span>
+                    <HardHat size={16} color="#D97706" />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Field Officer</span>
                   </div>
-                  <ArrowRight size={13} color={tokens.warn} />
+                  <ArrowRight size={13} color="#D97706" />
                 </div>
-                <div style={{ fontSize: 11, color: tokens.slate, lineHeight: 1.2 }}>
-                  {(requestedRole === "field_officer" || requestedRole === "field") ? "★ Pre-selected from Landing" : "Site Telemetry View"}
+                <div style={{ fontSize: 11, color: "#64748B", lineHeight: 1.3 }}>
+                  Site Telemetry View
                 </div>
               </button>
             </div>
           </div>
 
+          {/* Divider */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              margin: "18px 0 16px",
-              color: tokens.slate,
+              gap: 12,
+              margin: "20px 0",
+              color: "#94A3B8",
               fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.05em",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
             }}
           >
-            <div style={{ flex: 1, height: 1, background: tokens.line }} />
-            <span>OR SIGN IN WITH PASSWORD</span>
-            <div style={{ flex: 1, height: 1, background: tokens.line }} />
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+            <span>OR SIGN IN WITH CREDENTIALS</span>
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
           </div>
 
+          {/* Credentials Form */}
           <form onSubmit={handleSubmit}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: tokens.ink, marginBottom: 16 }}>
-              Officer Sign In
-            </div>
-
-            {/* Error Message */}
+            {/* Error Notification */}
             {errorMsg && (
               <div
                 style={{
                   padding: "10px 14px",
-                  background: tokens.badBg,
-                  borderRadius: tokens.radiusSm,
-                  border: `1px solid ${tokens.bad}44`,
-                  color: tokens.bad,
+                  background: "#FEF2F2",
+                  borderRadius: "8px",
+                  border: "1px solid #FECACA",
+                  color: "#DC2626",
                   fontSize: 12,
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   gap: 8,
-                  marginBottom: 16,
+                  marginBottom: 18,
                   lineHeight: 1.4,
                 }}
               >
-                <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            {/* Email Field */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 5 }}>
+            {/* Email Input (Lifts up on hover/focus) */}
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: "#334155",
+                  letterSpacing: "0.04em",
+                  marginBottom: 6,
+                }}
+              >
                 OFFICIAL EMAIL ADDRESS
               </label>
               <div style={{ position: "relative" }}>
@@ -266,25 +398,34 @@ export function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@mospi.gov.in"
+                  className="card-box-lift"
                   style={{
                     width: "100%",
-                    padding: "9px 12px 9px 34px",
-                    fontSize: 13,
-                    border: `1px solid ${tokens.line}`,
-                    borderRadius: tokens.radiusSm,
-                    background: tokens.panel,
-                    color: tokens.ink,
+                    padding: "11px 14px 11px 38px",
+                    fontSize: 13.5,
+                    border: "1px solid #CBD5E1",
+                    borderRadius: "10px",
+                    background: "#F8FAFC",
+                    color: "#0F172A",
                     outline: "none",
                   }}
                 />
-                <Mail size={15} color={tokens.slate} style={{ position: "absolute", left: 10, top: 11 }} />
+                <Mail size={16} color="#64748B" style={{ position: "absolute", left: 12, top: 13 }} />
               </div>
             </div>
 
-            {/* Password Field */}
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: tokens.slate, marginBottom: 5 }}>
+            {/* Password Input (Lifts up on hover/focus) */}
+            <div style={{ marginBottom: 24 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: "#334155",
+                  letterSpacing: "0.04em",
+                  marginBottom: 6,
+                }}
+              >
                 SECURITY PASSCODE
               </label>
               <div style={{ position: "relative" }}>
@@ -293,110 +434,96 @@ export function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
+                  className="card-box-lift"
                   style={{
-                    ...monoStyle,
                     width: "100%",
-                    padding: "9px 12px 9px 34px",
-                    fontSize: 13,
-                    border: `1px solid ${tokens.line}`,
-                    borderRadius: tokens.radiusSm,
-                    background: tokens.panel,
-                    color: tokens.ink,
+                    padding: "11px 14px 11px 38px",
+                    fontSize: 13.5,
+                    border: "1px solid #CBD5E1",
+                    borderRadius: "10px",
+                    background: "#F8FAFC",
+                    color: "#0F172A",
                     outline: "none",
+                    letterSpacing: "0.15em",
                   }}
                 />
-                <Lock size={15} color={tokens.slate} style={{ position: "absolute", left: 10, top: 11 }} />
+                <Lock size={16} color="#64748B" style={{ position: "absolute", left: 12, top: 13 }} />
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Button (Lifts up on hover) */}
             <button
               type="submit"
               disabled={isSubmitting}
+              className="card-box-lift"
               style={{
                 width: "100%",
-                padding: "10px",
-                background: isSubmitting ? tokens.slate : tokens.steel,
-                color: "#FFFFFF",
+                padding: "12px",
+                background: isSubmitting
+                  ? "#CBD5E1"
+                  : "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                color: "#0F172A",
                 border: "none",
-                borderRadius: tokens.radiusSm,
-                fontWeight: 600,
-                fontSize: 13,
+                borderRadius: "10px",
+                fontWeight: 800,
+                fontSize: 14,
+                letterSpacing: "0.03em",
                 cursor: isSubmitting ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
-                transition: "background 0.15s ease",
+                boxShadow: "0 4px 16px rgba(245, 158, 11, 0.35)",
               }}
             >
-              <span>{isSubmitting ? "Authenticating..." : "Sign In to Portal"}</span>
-              <ArrowRight size={14} />
+              <span>{isSubmitting ? "Authenticating Official..." : "Sign In to Portal"}</span>
+              <ArrowRight size={16} color="#0F172A" />
             </button>
           </form>
-
-          {/* Quick Demo Fill Buttons (Convenient for Reviewers) */}
-          <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => fillDemo("admin")}
-              style={{
-                flex: 1,
-                padding: "6px 8px",
-                background: tokens.paper,
-                border: `1px solid ${tokens.line}`,
-                borderRadius: tokens.radiusSm,
-                fontSize: 11,
-                color: tokens.slate,
-                cursor: "pointer",
-              }}
-            >
-              Demo Admin Email
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemo("field")}
-              style={{
-                flex: 1,
-                padding: "6px 8px",
-                background: tokens.paper,
-                border: `1px solid ${tokens.line}`,
-                borderRadius: tokens.radiusSm,
-                fontSize: 11,
-                color: tokens.slate,
-                cursor: "pointer",
-              }}
-            >
-              Demo Field Email
-            </button>
-          </div>
 
           {/* Register Link */}
           <div
             style={{
-              marginTop: 18,
-              paddingTop: 14,
-              borderTop: `1px solid ${tokens.line}`,
-              fontSize: 12,
-              color: tokens.slate,
+              marginTop: 22,
+              paddingTop: 16,
+              borderTop: "1px solid #E2E8F0",
+              fontSize: 12.5,
+              color: "#64748B",
               textAlign: "center",
             }}
           >
-            Don't have an account?{" "}
+            Don't have an official account?{" "}
             <Link
               to="/register"
               style={{
-                color: tokens.steel,
-                fontWeight: 600,
+                color: "#D97706",
+                fontWeight: 700,
                 textDecoration: "none",
               }}
             >
-              Register here
+              Register here →
             </Link>
           </div>
-        </Panel>
-      </div>
+        </div>
+
+        {/* Return to Public Portal */}
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <Link
+            to="/"
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: "#64748B",
+              textDecoration: "none",
+              transition: "color 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#0F172A")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#64748B")}
+          >
+            ← Back to National Infrastructure Portal
+          </Link>
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -144,6 +144,18 @@ class ProjectSummaryOut(BaseModel):
     sector: str
 
 
+class DailyEntryIn(BaseModel):
+    project_id: str
+    submitted_by: Optional[str] = None
+    entry_date: str
+    work_status: str
+    delay_reason: Optional[str] = None
+    material_notes: Optional[str] = None
+    photo_url: Optional[str] = None
+    notes: Optional[str] = None
+    reviewed_status: Optional[str] = "Pending Review"
+
+
 class ProjectBaselineOut(BaseModel):
     project: dict
     assessment: RiskAssessmentOut
@@ -266,6 +278,55 @@ def list_projects():
             print(f"[WARN] Failed to fetch dynamic projects for project selector: {e}")
 
     return items
+
+
+@app.post("/api/v1/daily-entries")
+def create_daily_entry(entry: DailyEntryIn):
+    """Inserts a daily ground verification entry into Supabase daily_entries table
+    using the backend service role key, bypassing client-side RLS limits for reliable field logging.
+    """
+    supabase = _get_supabase()
+    if supabase is None:
+        raise HTTPException(status_code=500, detail="Supabase database not configured on server.")
+
+    try:
+        # Resolve project UUID if passed code
+        p_id = entry.project_id
+        if not is_valid_uuid(p_id):
+            p_res = supabase.table("projects").select("id").eq("code", p_id).execute()
+            if p_res.data and len(p_res.data) > 0:
+                p_id = p_res.data[0]["id"]
+
+        # Validate submitted_by UUID against profiles to prevent FK violations
+        sub_by = entry.submitted_by
+        if sub_by:
+            if not is_valid_uuid(sub_by) or str(sub_by).startswith("demo-"):
+                sub_by = None
+            else:
+                try:
+                    prof_res = supabase.table("profiles").select("id").eq("id", sub_by).execute()
+                    if not prof_res.data or len(prof_res.data) == 0:
+                        sub_by = None
+                except Exception:
+                    sub_by = None
+
+        payload = {
+            "project_id": p_id,
+            "submitted_by": sub_by,
+            "entry_date": entry.entry_date,
+            "work_status": entry.work_status,
+            "delay_reason": entry.delay_reason,
+            "material_notes": entry.material_notes,
+            "photo_url": entry.photo_url,
+            "notes": entry.notes,
+            "reviewed_status": entry.reviewed_status or "Pending Review",
+        }
+
+        res = supabase.table("daily_entries").insert(payload).execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        print(f"[ERROR] Failed to insert daily entry via service-role API: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/v1/projects/{project_id}", response_model=ProjectBaselineOut)

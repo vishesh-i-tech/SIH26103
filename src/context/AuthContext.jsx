@@ -240,6 +240,34 @@ export function AuthProvider({ children }) {
     return { user: newUser, role: roleName };
   };
 
+  // Persistent local site submissions for offline/demo and instant UI reactivity
+  const [submissions, setSubmissions] = useState(() => {
+    try {
+      const saved = localStorage.getItem("paimana_submissions");
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const addSubmission = (newEntry) => {
+    setSubmissions((prev) => {
+      const entryWithId = {
+        id: newEntry.id || `local-${Date.now()}`,
+        date: newEntry.date || new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date()),
+        reviewStatus: newEntry.reviewStatus || "Pending Review",
+        ...newEntry,
+      };
+      const updated = [entryWithId, ...prev];
+      try {
+        localStorage.setItem("paimana_submissions", JSON.stringify(updated));
+      } catch (err) {
+        console.warn("Could not write submissions to localStorage:", err);
+      }
+      return updated;
+    });
+  };
+
   // Normalized role values: 'admin' or 'field_officer'
   const normalizedRole = profile?.role === "field" ? "field_officer" : (profile?.role || null);
   const officerName = profile?.full_name || (normalizedRole === "field_officer" ? "Field Officer" : "MoSPI Admin");
@@ -253,6 +281,8 @@ export function AuthProvider({ children }) {
         role: normalizedRole,
         officerName,
         loading,
+        submissions,
+        addSubmission,
         signIn,
         signUp,
         logout,

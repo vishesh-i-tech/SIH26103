@@ -1,6 +1,5 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
-import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { tokens } from "../styles/tokens";
 
@@ -9,30 +8,21 @@ export function Layout() {
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         minHeight: "100vh",
         background: tokens.paper,
+        position: "relative",
       }}
     >
-      <Sidebar />
-      <div
+      <Header />
+      <main
         style={{
           flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
-          background: tokens.paper,
+          overflowY: "auto",
         }}
       >
-        <Header />
-        <main
-          style={{
-            flex: 1,
-            overflowY: "auto",
-          }}
-        >
-          <Outlet />
-        </main>
-      </div>
+        <Outlet />
+      </main>
     </div>
   );
 }

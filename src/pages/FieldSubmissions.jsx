@@ -73,9 +73,12 @@ export function FieldSubmissions() {
           photoName: d.photo_url,
           reviewStatus: d.reviewed_status,
         }));
-        setSubmissions(formatted);
+
+        const existingIds = new Set(data.map((d) => d.id));
+        const localOnly = (contextSubmissions || []).filter((s) => !existingIds.has(s.id));
+        setSubmissions([...localOnly, ...formatted]);
       } else {
-        // If user has no entries yet, show context submissions or empty
+        // If query returned no remote entries, show context submissions
         setSubmissions(contextSubmissions || []);
       }
     } catch (err) {
