@@ -37,14 +37,18 @@ export function AuthProvider({ children }) {
       if (!isSupabaseConfigured()) {
         // Fallback for demo when Supabase credentials have not been configured yet
         const savedRole = localStorage.getItem("paimana_role");
-        const savedName = localStorage.getItem("paimana_officer");
+        let savedName = localStorage.getItem("paimana_officer");
+        if (savedName && (savedName.toLowerCase().includes("vishesh") || savedName.toLowerCase().includes("harshal"))) {
+          savedName = savedRole === "admin" ? "Dr. Alok Srivastava (MoSPI Admin)" : "Er. Manoj K. Sharma (Field Officer)";
+          localStorage.setItem("paimana_officer", savedName);
+        }
         if (savedRole) {
           setProfile({
             id: "demo-user-id",
-            full_name: savedName || (savedRole === "admin" ? "MoSPI IPMD Admin" : "Er. Rajesh Verma"),
+            full_name: savedName || (savedRole === "admin" ? "Dr. Alok Srivastava (MoSPI Admin)" : "Er. Manoj K. Sharma (Field Officer)"),
             role: savedRole,
           });
-          setUser({ id: "demo-user-id", email: "demo@mospi.gov.in" });
+          setUser({ id: "demo-user-id", email: savedRole === "admin" ? "alok.srivastava@mospi.gov.in" : "manoj.sharma@mospi.gov.in" });
         }
         if (mounted) setLoading(false);
         return;
@@ -226,8 +230,8 @@ export function AuthProvider({ children }) {
   // Instant seamless role switcher for demo and evaluation
   const switchRole = (newRole) => {
     const roleName = newRole === "field_officer" || newRole === "field" ? "field_officer" : "admin";
-    const name = roleName === "admin" ? "Vishesh indorkar (MoSPI Admin)" : "harshal shinde (Field Officer)";
-    const email = roleName === "admin" ? "vishu@mospi.gov.in" : "field.officer@mospi.gov.in";
+    const name = roleName === "admin" ? "Dr. Alok Srivastava (MoSPI Admin)" : "Er. Manoj K. Sharma (Field Officer)";
+    const email = roleName === "admin" ? "alok.srivastava@mospi.gov.in" : "manoj.sharma@mospi.gov.in";
     const id = roleName === "admin" ? "6b70c5b1-2014-42b7-b1f4-06489af1ec0f" : "b3834545-6334-4448-9c3f-5b758fc85880";
 
     const newProfile = { id, full_name: name, role: roleName };

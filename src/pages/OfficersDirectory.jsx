@@ -28,8 +28,8 @@ import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 const SEED_OFFICERS = [
   {
     id: "off-001",
-    fullName: "Vishesh Indorkar",
-    email: "vishu@mospi.gov.in",
+    fullName: "Dr. Alok Srivastava, ISS",
+    email: "alok.srivastava@mospi.gov.in",
     role: "admin",
     designation: "Director General & Chief Risk Auditor",
     department: "Infrastructure & Project Monitoring Division (IPMD)",
@@ -49,8 +49,8 @@ const SEED_OFFICERS = [
   },
   {
     id: "off-002",
-    fullName: "Harshal Shinde",
-    email: "field.officer@mospi.gov.in",
+    fullName: "Er. Manoj K. Sharma",
+    email: "manoj.sharma@mospi.gov.in",
     role: "field_officer",
     designation: "Senior Zonal Field Inspection Engineer",
     department: "Western Zone Rail & Highway Corridor Taskforce",
