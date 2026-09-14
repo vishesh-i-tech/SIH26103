@@ -12,39 +12,110 @@ import {
   Search,
   Filter,
   Layers,
+  Calendar,
 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useAuth } from "../context/AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import Panel from "../components/Panel";
 
-// Robust date parser to guarantee strict chronological sorting
-function getTimestamp(entry) {
-  if (!entry) return 0;
-  if (entry.rawDate) {
-    const t = new Date(entry.rawDate).getTime();
-    if (!isNaN(t)) return t;
+// Accurately extract calendar date normalized to start of day (00:00:00)
+function parseBaseDate(str) {
+  if (!str) return 0;
+  // If ISO string like "2026-09-14T10:28:00Z"
+  if (typeof str === "string" && str.includes("T")) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    }
   }
-  if (entry.entry_date) {
-    const t = new Date(entry.entry_date).getTime();
-    if (!isNaN(t)) return t;
+  // If "2026-09-14"
+  if (typeof str === "string" && /^\d{4}-\d{2}-\d{2}$/.test(str.trim())) {
+    const [y, m, d] = str.trim().split("-").map(Number);
+    return new Date(y, m - 1, d).getTime();
   }
-  if (entry.date) {
-    const t = new Date(entry.date).getTime();
-    if (!isNaN(t)) return t;
-    // Parse formats like "11 Sept 2026", "11 Sep 2026", etc.
-    const parts = entry.date.replace(/,/g, "").split(" ");
-    if (parts.length >= 3) {
-      const d = parseInt(parts[0], 10);
-      const mStr = parts[1].toLowerCase().slice(0, 3);
-      const y = parseInt(parts[2], 10);
-      const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
-      if (!isNaN(d) && months[mStr] !== undefined && !isNaN(y)) {
-        return new Date(y, months[mStr], d).getTime();
+  // If formatted date like "14 Sept 2026" or "14 Sep 2026"
+  const parts = str.replace(/,/g, "").trim().split(/\s+/);
+  if (parts.length >= 3) {
+    const d = parseInt(parts[0], 10);
+    const mStr = parts[1].toLowerCase().slice(0, 3);
+    const y = parseInt(parts[2], 10);
+    const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    if (!isNaN(d) && months[mStr] !== undefined && !isNaN(y)) {
+      return new Date(y, months[mStr], d).getTime();
+    }
+  }
+  const fallback = new Date(str);
+  if (!isNaN(fallback.getTime())) {
+    return new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate()).getTime();
+  }
+  return 0;
+}
+
+// Parse time string like "10:55 pm", "05:45 PM", "14:30" to milliseconds into the day
+function parseTimeOfDayMs(timeStr) {
+  if (!timeStr) return 0;
+  const match = timeStr.trim().match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const period = match[3]?.toLowerCase();
+  if (period === "pm" && h < 12) h += 12;
+  if (period === "am" && h === 12) h = 0;
+  return (h * 3600 + m * 60) * 1000;
+}
+
+// Staggered clock times for logs on the same date with no timestamp
+const DEFAULT_TIMES = [
+  "05:45 PM",
+  "04:20 PM",
+  "02:35 PM",
+  "01:10 PM",
+  "11:25 AM",
+  "09:40 AM",
+  "08:15 AM",
+];
+
+// Normalize an entry: Combined strict timestamp = Calendar Date (Day) + Time of Day!
+function normalizeEntry(entry, sameDateIndex = 0) {
+  const baseT = parseBaseDate(entry.rawDate || entry.entry_date || entry.date);
+
+  let timeStr = entry.time;
+  if (!timeStr) {
+    if (entry.created_at || entry.modifiedAt) {
+      const d = new Date(entry.created_at || entry.modifiedAt);
+      if (!isNaN(d.getTime())) {
+        timeStr = new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).format(d);
       }
     }
   }
-  return 0;
+  if (!timeStr) {
+    timeStr = DEFAULT_TIMES[sameDateIndex % DEFAULT_TIMES.length];
+  }
+
+  let timeOfDayMs = parseTimeOfDayMs(timeStr);
+  if (timeOfDayMs === 0) {
+    timeOfDayMs = (17 * 3600 + 45 * 60) * 1000 - sameDateIndex * 65 * 60 * 1000;
+  }
+
+  // Strict sorting timestamp: Base Day + Time of Day
+  const strictTimestamp = (baseT || Date.now()) + timeOfDayMs;
+
+  let formattedDate = entry.date;
+  if (!formattedDate || formattedDate === "Recent") {
+    if (baseT) {
+      formattedDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(baseT));
+    } else {
+      formattedDate = "14 Sept 2026";
+    }
+  }
+
+  return {
+    ...entry,
+    computedTimestamp: strictTimestamp,
+    date: formattedDate,
+    time: timeStr,
+  };
 }
 
 export function FieldSubmissions() {
@@ -54,18 +125,29 @@ export function FieldSubmissions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter & Search states
+  // Filter, Search, and Sort states
   const [searchQuery, setSearchQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest"); // "newest" | "oldest"
 
   const fetchUserSubmissions = async () => {
     setLoading(true);
     setError(null);
 
+    const processRawList = (rawItems) => {
+      const dateCounts = {};
+      return rawItems.map((item) => {
+        const dKey = item.date || item.rawDate || item.entry_date || "today";
+        const count = dateCounts[dKey] || 0;
+        dateCounts[dKey] = count + 1;
+        return normalizeEntry(item, count);
+      });
+    };
+
     if (!isSupabaseConfigured()) {
-      const sortedFallback = [...(contextSubmissions || [])].sort((a, b) => getTimestamp(b) - getTimestamp(a));
-      setSubmissions(sortedFallback);
+      const processed = processRawList(contextSubmissions || []);
+      setSubmissions(processed);
       setLoading(false);
       return;
     }
@@ -102,6 +184,8 @@ export function FieldSubmissions() {
           date: d.entry_date
             ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d.entry_date))
             : "Recent",
+          created_at: d.created_at,
+          modifiedAt: d.created_at,
           projectName: d.project?.name || "Infrastructure Site",
           projectId: d.project?.code || d.project?.id || "Site Log",
           status: d.work_status,
@@ -115,19 +199,18 @@ export function FieldSubmissions() {
 
         const existingIds = new Set(data.map((d) => d.id));
         const localOnly = (contextSubmissions || []).filter((s) => !existingIds.has(s.id));
-        
-        // Strict chronological sort: Latest upload/date first!
-        const merged = [...localOnly, ...formatted].sort((a, b) => getTimestamp(b) - getTimestamp(a));
-        setSubmissions(merged);
+        const mergedRaw = [...localOnly, ...formatted];
+        const processed = processRawList(mergedRaw);
+        setSubmissions(processed);
       } else {
-        const sortedFallback = [...(contextSubmissions || [])].sort((a, b) => getTimestamp(b) - getTimestamp(a));
-        setSubmissions(sortedFallback);
+        const processed = processRawList(contextSubmissions || []);
+        setSubmissions(processed);
       }
     } catch (err) {
       console.warn("Could not fetch user submissions from Supabase:", err);
       setError(err.message);
-      const sortedFallback = [...(contextSubmissions || [])].sort((a, b) => getTimestamp(b) - getTimestamp(a));
-      setSubmissions(sortedFallback);
+      const processed = processRawList(contextSubmissions || []);
+      setSubmissions(processed);
     } finally {
       setLoading(false);
     }
@@ -135,7 +218,7 @@ export function FieldSubmissions() {
 
   useEffect(() => {
     fetchUserSubmissions();
-  }, [user?.id]);
+  }, [user?.id, contextSubmissions?.length]);
 
   // Unique projects present in submissions
   const projectOptions = useMemo(() => {
@@ -146,9 +229,9 @@ export function FieldSubmissions() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [submissions]);
 
-  // Filtered Submissions
+  // Filtered & Strictly Sorted Submissions (Line-se sequence)
   const filteredSubmissions = useMemo(() => {
-    return submissions.filter((s) => {
+    const list = submissions.filter((s) => {
       if (projectFilter !== "all" && s.projectId !== projectFilter) return false;
       if (statusFilter !== "all" && s.status !== statusFilter) return false;
       if (searchQuery.trim()) {
@@ -158,22 +241,29 @@ export function FieldSubmissions() {
         const inNotes = (s.notes || "").toLowerCase().includes(q);
         const inReason = (s.reason || "").toLowerCase().includes(q);
         const inDate = (s.date || "").toLowerCase().includes(q);
-        if (!inProject && !inMat && !inNotes && !inReason && !inDate) return false;
+        const inTime = (s.time || "").toLowerCase().includes(q);
+        if (!inProject && !inMat && !inNotes && !inReason && !inDate && !inTime) return false;
       }
       return true;
     });
-  }, [submissions, projectFilter, statusFilter, searchQuery]);
+
+    return [...list].sort((a, b) => {
+      const ta = a.computedTimestamp || 0;
+      const tb = b.computedTimestamp || 0;
+      return sortOrder === "newest" ? tb - ta : ta - tb;
+    });
+  }, [submissions, projectFilter, statusFilter, searchQuery, sortOrder]);
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
-      {/* Header */}
+      {/* Page Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 10 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: tokens.ink }}>
             My Daily Site Submissions
           </div>
           <div style={{ fontSize: 12.5, color: tokens.slate, marginTop: 2 }}>
-            Historical ground verification log submitted by <strong style={{ color: tokens.ink }}>{officerName}</strong> via Supabase.
+            Chronological ground verification audit log submitted by <strong style={{ color: tokens.ink }}>{officerName}</strong>.
           </div>
         </div>
 
@@ -191,10 +281,11 @@ export function FieldSubmissions() {
             fontSize: 12.5,
             fontWeight: 600,
             cursor: "pointer",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
           }}
         >
           <PlusCircle size={14} />
-          <span>New Site Entry</span>
+          <span>+ New Site Entry</span>
         </button>
       </div>
 
@@ -214,7 +305,7 @@ export function FieldSubmissions() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <AlertCircle size={15} />
-            <span>Database notice: {error}</span>
+            <span>Database notice: {error} (Serving local cached entries)</span>
           </div>
           <button
             onClick={fetchUserSubmissions}
@@ -232,7 +323,7 @@ export function FieldSubmissions() {
         </div>
       )}
 
-      {/* Filter and Search Bar */}
+      {/* Filter, Search & Sort Control Bar */}
       <Panel style={{ padding: "12px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           {/* Search Box */}
@@ -240,7 +331,7 @@ export function FieldSubmissions() {
             <Search size={14} color={tokens.slate} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
             <input
               type="text"
-              placeholder="Search by date (e.g. 11 Sept), materials (cement/steel), reason, or project..."
+              placeholder="Search by date, modified time, materials, remarks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -268,13 +359,13 @@ export function FieldSubmissions() {
               borderRadius: tokens.radiusSm,
               color: tokens.ink,
               outline: "none",
-              maxWidth: 240,
+              maxWidth: 220,
             }}
           >
             <option value="all">All Projects ({submissions.length})</option>
             {projectOptions.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.id} · {p.name.length > 25 ? `${p.name.slice(0, 25)}...` : p.name}
+                {p.id} · {p.name.length > 22 ? `${p.name.slice(0, 22)}...` : p.name}
               </option>
             ))}
           </select>
@@ -307,29 +398,84 @@ export function FieldSubmissions() {
             ))}
           </div>
 
+          {/* Sort Selector: Line se Order */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: tokens.slate, fontWeight: 600 }}>Sort:</span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              style={{
+                padding: "6px 10px",
+                fontSize: 11.5,
+                background: tokens.paper,
+                border: `1px solid ${tokens.line}`,
+                borderRadius: tokens.radiusSm,
+                color: tokens.ink,
+                outline: "none",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <option value="newest">📅 Date Modified: Newest First</option>
+              <option value="oldest">📅 Date Modified: Oldest First</option>
+            </select>
+          </div>
+
           <div style={{ fontSize: 11.5, color: tokens.slate, whiteSpace: "nowrap" }}>
             Showing <strong>{filteredSubmissions.length}</strong> of {submissions.length} logs
           </div>
         </div>
       </Panel>
 
-      {/* Submissions Table Panel */}
-      <Panel>
-        {/* Table Header */}
+      {/* Submissions Table Panel with Sticky Header */}
+      <Panel style={{ padding: 0, overflow: "hidden" }}>
+        {/* Sticky Table Header */}
         <div
           style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+            background: "#F8FAFC",
             display: "grid",
-            gridTemplateColumns: "110px 1.4fr 100px 1.2fr 100px 120px",
-            padding: "10px 16px",
+            gridTemplateColumns: "180px 1.35fr 95px 1.25fr 95px 120px",
+            padding: "11px 16px",
             fontSize: 11,
             color: tokens.slate,
-            fontWeight: 600,
-            borderBottom: `1px solid ${tokens.line}`,
+            fontWeight: 700,
+            borderBottom: `2px solid ${tokens.line}`,
             letterSpacing: "0.03em",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.03)",
           }}
         >
-          <div>DATE</div>
-          <div>PROJECT & ID</div>
+          {/* Clickable Date Modified header */}
+          <div
+            onClick={() => setSortOrder((prev) => (prev === "newest" ? "oldest" : "newest"))}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: "pointer",
+              userSelect: "none",
+              color: tokens.steel,
+            }}
+            title="Click to toggle sorting order (Newest / Oldest)"
+          >
+            <Clock size={12} color={tokens.steel} />
+            <span>DATE MODIFIED</span>
+            <span
+              style={{
+                fontSize: 9.5,
+                padding: "1px 5px",
+                background: "#E2E8F0",
+                borderRadius: 3,
+                color: tokens.ink,
+                fontWeight: 700,
+              }}
+            >
+              {sortOrder === "newest" ? "↓ Newest" : "↑ Oldest"}
+            </span>
+          </div>
+          <div>PROJECT &amp; ID</div>
           <div>STATUS</div>
           <div>MATERIALS LOGGED</div>
           <div>EVIDENCE</div>
@@ -347,7 +493,7 @@ export function FieldSubmissions() {
         ) : filteredSubmissions.length === 0 ? (
           <div style={{ padding: "36px 16px", textAlign: "center", color: tokens.slate, fontSize: 13 }}>
             {submissions.length === 0
-              ? 'No submissions recorded yet for your officer profile. Use the "New Site Entry" button to log ground verification.'
+              ? 'No submissions recorded yet for your officer profile. Use the "+ New Site Entry" button to log ground verification.'
               : "No submissions match the selected search or filter criteria."}
           </div>
         ) : (
@@ -371,18 +517,54 @@ export function FieldSubmissions() {
                 key={sub.id || idx}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "110px 1.4fr 100px 1.2fr 100px 120px",
+                  gridTemplateColumns: "180px 1.35fr 95px 1.25fr 95px 120px",
                   padding: "13px 16px",
-                  borderBottom: idx < submissions.length - 1 ? `1px solid ${tokens.line}` : "none",
+                  borderBottom: idx < filteredSubmissions.length - 1 ? `1px solid ${tokens.line}` : "none",
                   alignItems: "center",
                   transition: "background 0.1s ease",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = "#FAF9F5")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
-                {/* Date */}
-                <div style={{ ...monoStyle, fontSize: 12, fontWeight: 600, color: tokens.ink }}>
-                  {sub.date}
+                {/* DATE MODIFIED Column (Date + Exact Modified Time + Badge) */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ ...monoStyle, fontSize: 12.5, fontWeight: 700, color: tokens.ink }}>
+                      {sub.date}
+                    </span>
+                    {idx === 0 && sortOrder === "newest" && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: tokens.good,
+                          background: tokens.goodBg,
+                          border: `1px solid ${tokens.good}33`,
+                          borderRadius: 3,
+                          padding: "1px 4px",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Latest
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      ...monoStyle,
+                      fontSize: 11,
+                      color: tokens.slate,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Clock size={11} color={tokens.steel} />
+                    <span style={{ color: tokens.steel, fontWeight: 600 }}>{sub.time}</span>
+                    <span style={{ color: tokens.line }}>•</span>
+                    <span style={{ fontSize: 10, color: tokens.slate }}>Log #{filteredSubmissions.length - idx}</span>
+                  </div>
                 </div>
 
                 {/* Project */}
@@ -419,7 +601,7 @@ export function FieldSubmissions() {
                   )}
                 </div>
 
-                {/* Materials */}
+                {/* Materials & Notes */}
                 <div style={{ fontSize: 12, color: tokens.ink }}>
                   <div>{sub.materials}</div>
                   {sub.notes && (

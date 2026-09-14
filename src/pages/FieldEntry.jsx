@@ -167,11 +167,22 @@ export function FieldEntry() {
 
       // Record in local context state for immediate preview and timeline integration
       if (typeof addSubmission === "function") {
+        const now = new Date();
+        const timeNow = new Intl.DateTimeFormat("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }).format(now);
+
         addSubmission({
           id: insertedData?.[0]?.id || `sub-${Date.now()}`,
           projectId: project.code || project.id,
           projectName: project.name,
           date: date,
+          created_at: now.toISOString(),
+          modifiedAt: now.toISOString(),
+          time: timeNow,
+          timestamp: now.getTime(),
           status,
           reason: status !== "Running" ? reason : "",
           materials: status === "Running" && materialsSummary.length > 0 ? materialsSummary.join(" · ") : "None logged (Site Off / Halted)",

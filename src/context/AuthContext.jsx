@@ -256,9 +256,19 @@ export function AuthProvider({ children }) {
 
   const addSubmission = (newEntry) => {
     setSubmissions((prev) => {
+      const now = new Date();
+      const timeStr = new Intl.DateTimeFormat("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }).format(now);
       const entryWithId = {
         id: newEntry.id || `local-${Date.now()}`,
-        date: newEntry.date || new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date()),
+        date: newEntry.date || new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(now),
+        created_at: newEntry.created_at || now.toISOString(),
+        modifiedAt: newEntry.modifiedAt || now.toISOString(),
+        time: newEntry.time || timeStr,
+        timestamp: Date.now(),
         reviewStatus: newEntry.reviewStatus || "Pending Review",
         ...newEntry,
       };
