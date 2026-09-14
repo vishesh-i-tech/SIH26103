@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Send,
@@ -9,11 +9,43 @@ import {
   FileText,
   AlertCircle,
   RefreshCw,
+  Search,
+  Filter,
+  Layers,
 } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 import { useAuth } from "../context/AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import Panel from "../components/Panel";
+
+// Robust date parser to guarantee strict chronological sorting
+function getTimestamp(entry) {
+  if (!entry) return 0;
+  if (entry.rawDate) {
+    const t = new Date(entry.rawDate).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (entry.entry_date) {
+    const t = new Date(entry.entry_date).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (entry.date) {
+    const t = new Date(entry.date).getTime();
+    if (!isNaN(t)) return t;
+    // Parse formats like "11 Sept 2026", "11 Sep 2026", etc.
+    const parts = entry.date.replace(/,/g, "").split(" ");
+    if (parts.length >= 3) {
+      const d = parseInt(parts[0], 10);
+      const mStr = parts[1].toLowerCase().slice(0, 3);
+      const y = parseInt(parts[2], 10);
+      const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+      if (!isNaN(d) && months[mStr] !== undefined && !isNaN(y)) {
+        return new Date(y, months[mStr], d).getTime();
+      }
+    }
+  }
+  return 0;
+}
 
 export function FieldSubmissions() {
   const navigate = useNavigate();
@@ -22,12 +54,18 @@ export function FieldSubmissions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Filter & Search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
   const fetchUserSubmissions = async () => {
     setLoading(true);
     setError(null);
 
     if (!isSupabaseConfigured()) {
-      setSubmissions(contextSubmissions || []);
+      const sortedFallback = [...(contextSubmissions || [])].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+      setSubmissions(sortedFallback);
       setLoading(false);
       return;
     }
@@ -60,6 +98,7 @@ export function FieldSubmissions() {
       if (data && data.length > 0) {
         const formatted = data.map((d) => ({
           id: d.id,
+          rawDate: d.entry_date,
           date: d.entry_date
             ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d.entry_date))
             : "Recent",
@@ -76,15 +115,19 @@ export function FieldSubmissions() {
 
         const existingIds = new Set(data.map((d) => d.id));
         const localOnly = (contextSubmissions || []).filter((s) => !existingIds.has(s.id));
-        setSubmissions([...localOnly, ...formatted]);
+        
+        // Strict chronological sort: Latest upload/date first!
+        const merged = [...localOnly, ...formatted].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+        setSubmissions(merged);
       } else {
-        // If query returned no remote entries, show context submissions
-        setSubmissions(contextSubmissions || []);
+        const sortedFallback = [...(contextSubmissions || [])].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+        setSubmissions(sortedFallback);
       }
     } catch (err) {
       console.warn("Could not fetch user submissions from Supabase:", err);
       setError(err.message);
-      setSubmissions(contextSubmissions || []);
+      const sortedFallback = [...(contextSubmissions || [])].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+      setSubmissions(sortedFallback);
     } finally {
       setLoading(false);
     }
@@ -93,6 +136,33 @@ export function FieldSubmissions() {
   useEffect(() => {
     fetchUserSubmissions();
   }, [user?.id]);
+
+  // Unique projects present in submissions
+  const projectOptions = useMemo(() => {
+    const map = new Map();
+    submissions.forEach((s) => {
+      if (s.projectId) map.set(s.projectId, s.projectName || s.projectId);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [submissions]);
+
+  // Filtered Submissions
+  const filteredSubmissions = useMemo(() => {
+    return submissions.filter((s) => {
+      if (projectFilter !== "all" && s.projectId !== projectFilter) return false;
+      if (statusFilter !== "all" && s.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const inProject = (s.projectName || "").toLowerCase().includes(q) || (s.projectId || "").toLowerCase().includes(q);
+        const inMat = (s.materials || "").toLowerCase().includes(q);
+        const inNotes = (s.notes || "").toLowerCase().includes(q);
+        const inReason = (s.reason || "").toLowerCase().includes(q);
+        const inDate = (s.date || "").toLowerCase().includes(q);
+        if (!inProject && !inMat && !inNotes && !inReason && !inDate) return false;
+      }
+      return true;
+    });
+  }, [submissions, projectFilter, statusFilter, searchQuery]);
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
@@ -162,6 +232,87 @@ export function FieldSubmissions() {
         </div>
       )}
 
+      {/* Filter and Search Bar */}
+      <Panel style={{ padding: "12px 16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          {/* Search Box */}
+          <div style={{ position: "relative", minWidth: 260, flex: 1 }}>
+            <Search size={14} color={tokens.slate} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              type="text"
+              placeholder="Search by date (e.g. 11 Sept), materials (cement/steel), reason, or project..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "7px 10px 7px 32px",
+                fontSize: 12,
+                background: tokens.paper,
+                border: `1px solid ${tokens.line}`,
+                borderRadius: tokens.radiusSm,
+                color: tokens.ink,
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Project Dropdown */}
+          <select
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              fontSize: 12,
+              background: tokens.paper,
+              border: `1px solid ${tokens.line}`,
+              borderRadius: tokens.radiusSm,
+              color: tokens.ink,
+              outline: "none",
+              maxWidth: 240,
+            }}
+          >
+            <option value="all">All Projects ({submissions.length})</option>
+            {projectOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id} · {p.name.length > 25 ? `${p.name.slice(0, 25)}...` : p.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Status Filter Buttons */}
+          <div style={{ display: "inline-flex", background: tokens.paper, padding: 2, borderRadius: tokens.radiusSm, border: `1px solid ${tokens.line}` }}>
+            {[
+              { id: "all", label: "All Status" },
+              { id: "Running", label: "Running" },
+              { id: "Stalled", label: "Stalled" },
+              { id: "Off", label: "Weather Off" },
+            ].map((btn) => (
+              <button
+                key={btn.id}
+                type="button"
+                onClick={() => setStatusFilter(btn.id)}
+                style={{
+                  padding: "4px 9px",
+                  fontSize: 11,
+                  fontWeight: statusFilter === btn.id ? 700 : 500,
+                  background: statusFilter === btn.id ? tokens.panel : "transparent",
+                  color: statusFilter === btn.id ? tokens.ink : tokens.slate,
+                  border: "none",
+                  borderRadius: tokens.radiusSm,
+                  cursor: "pointer",
+                }}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11.5, color: tokens.slate, whiteSpace: "nowrap" }}>
+            Showing <strong>{filteredSubmissions.length}</strong> of {submissions.length} logs
+          </div>
+        </div>
+      </Panel>
+
       {/* Submissions Table Panel */}
       <Panel>
         {/* Table Header */}
@@ -193,12 +344,14 @@ export function FieldSubmissions() {
             </div>
             <div style={{ fontSize: 12 }}>Retrieving ground records from daily_entries</div>
           </div>
-        ) : submissions.length === 0 ? (
+        ) : filteredSubmissions.length === 0 ? (
           <div style={{ padding: "36px 16px", textAlign: "center", color: tokens.slate, fontSize: 13 }}>
-            No submissions recorded yet for your officer profile. Use the "New Site Entry" button to log ground verification.
+            {submissions.length === 0
+              ? 'No submissions recorded yet for your officer profile. Use the "New Site Entry" button to log ground verification.'
+              : "No submissions match the selected search or filter criteria."}
           </div>
         ) : (
-          submissions.map((sub, idx) => {
+          filteredSubmissions.map((sub, idx) => {
             const isReviewed = sub.reviewStatus === "Reviewed";
             const statusTone =
               sub.status === "Running"
