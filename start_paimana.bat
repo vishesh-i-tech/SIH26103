@@ -3,7 +3,13 @@ title PAIMANA AI - Startup Launcher
 echo ===================================================
 echo     PAIMANA AI - MoSPI Project Risk Platform
 echo ===================================================
-echo.
+cd /d "%~dp0"
+if not exist ".env" (
+    if exist ".env.example" (
+        echo [.env file not found - generating from .env.example...]
+        copy .env.example .env >nul
+    )
+)
 
 echo [1/2] Starting ML Backend Server (FastAPI on Port 8000)...
 cd /d "%~dp0ml"
@@ -15,6 +21,10 @@ if exist "..\.venv\Scripts\python.exe" (
 
 echo [2/2] Starting Frontend UI Server (Vite on Port 5173)...
 cd /d "%~dp0"
+if not exist "node_modules" (
+    echo [node_modules not found - installing dependencies...]
+    call npm install
+)
 start "PAIMANA AI - Frontend UI (Port 5173)" cmd /k "npm run dev"
 
 timeout /t 3 /nobreak >nul
