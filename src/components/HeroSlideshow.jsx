@@ -1,20 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, HardHat, ChevronLeft, ChevronRight, ArrowRight, Play, Pause, Compass, Zap, TrainFront, Layers } from "lucide-react";
+import { Shield, HardHat, ChevronLeft, ChevronRight, ArrowRight, Play, Pause, Zap, TrainFront, Layers } from "lucide-react";
 import { tokens, monoStyle } from "../styles/tokens";
 
 const SLIDES = [
-  {
-    id: 1,
-    image: "/images/slides/slide1.png",
-    tag: "CONSTRUCTION & EXECUTION TELEMETRY",
-    sector: "Civil Corridors & Engineering Works",
-    sectorIcon: Compass,
-    title: "Project Monitoring",
-    subtitle: "Central Sector Infrastructure Projects Costing Rs. 150 crore & above",
-    caption: "Real-time AI telemetry tracking physical milestones, vendor billing anomalies, and contractual delays.",
-  },
   {
     id: 2,
     image: "/images/slides/slide2.png",
